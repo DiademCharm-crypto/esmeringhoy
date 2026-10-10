@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en" class="age-locked">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="rating" content="adult">
+  <meta name="rating" content="RTA-5042-1996-1400-1577-RTA">
+  <meta name="referrer" content="no-referrer">
+  <title>ESMERINGHOY — Watch (18+)</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      if (localStorage.getItem("esh_age_ok") === "1") {
+        document.documentElement.classList.remove("age-locked");
+      }
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+  <div class="site-content">
+    <header>
+      <div class="brand-row">
+        <h1><a href="index.html">ESMERINGHOY</a></h1>
+        <div class="search-container">
+          <input type="search" id="search-input" placeholder="Search videos, tags…"
+                 autocomplete="off" aria-label="Search videos">
+          <a href="index.html" class="back-btn">← Back to home</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="player-wrapper">
+        <div class="player-heading">
+          <h2 id="current-title" class="featured-title">Loading…</h2>
+          <span id="current-quality" class="badge quality" hidden></span>
+        </div>
+
+        <div class="video-container" id="video-container">
+          <video id="player" class="vp-video" playsinline preload="metadata"></video>
+
+          <div class="vp-controls" id="vp-controls">
+            <button type="button" class="vp-btn vp-play" id="vp-play" aria-label="Play">
+              <svg class="ico ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.14v13.72L19 12z"/></svg>
+              <svg class="ico ico-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+            </button>
+
+            <input type="range" class="vp-seek" id="vp-seek" min="0" max="1000" step="1" value="0"
+                   aria-label="Seek" disabled>
+
+            <span class="vp-time" id="vp-time">0:00 / 0:00</span>
+
+            <button type="button" class="vp-btn vp-mute" id="vp-mute" aria-label="Mute">
+              <svg class="ico ico-volon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <svg class="ico ico-voloff" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+
+            <button type="button" class="vp-btn vp-full" id="vp-full" aria-label="Fullscreen">
+              <svg class="ico ico-fs" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="ico ico-fsexit" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+
+          <p class="vp-message" id="vp-message" hidden></p>
+        </div>
+
+        <div class="video-details">
+          <div class="video-meta" id="current-meta"></div>
+          <div class="tag-list" id="current-tags"></div>
+        </div>
+        <p class="player-note" id="video-note" hidden></p>
+      </section>
+
+      <section class="suggestions-section">
+        <h3 class="section-heading">You might also like</h3>
+        <div class="container" id="related-grid"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p><strong>ESMERINGHOY</strong> — 18+ adults only. All performers depicted are adults.</p>
+      <p class="footer-note">
+        Placeholder catalog: edit via the admin panel to publish your own licensed content.
+      </p>
+    </footer>
+  </div>
+
+  <script src="catalog.js"></script>
+  <script src="data.js"></script>
+  <script src="tracker.js"></script>
+  <script src="store.js"></script>
+  <script src="agegate.js"></script>
+  <script>
+    (function () {
+      var videos = window.ESMERINGHOY_VIDEOS || [];
+      var params = new URLSearchParams(window.location.search);
+      var requestedId = params.get("id");
+
+      var video = videos.filter(function (v) { return v.id === requestedId; })[0]
+        || videos.slice().sort(function (a, b) { return b.views - a.views; })[0];
+
+      if (!video) {
+        document.getElementById("current-title").textContent = "No videos available";
+        return;
+      }
+
+      var player = document.getElementById("player");
+      var container = document.getElementById("video-container");
+      var seek = document.getElementById("vp-seek");
+      var timeEl = document.getElementById("vp-time");
+      var playBtn = document.getElementById("vp-play");
+      var muteBtn = document.getElementById("vp-mute");
+      var fullBtn = document.getElementById("vp-full");
+      var messageEl = document.getElementById("vp-message");
+
+      var isSeeking = false;
+      var hideTimer = null;
+
+      /* ------------------------------------------------------------ helpers */
+
+      function fmt(seconds) {
+        if (!isFinite(seconds) || seconds < 0) seconds = 0;
+        seconds = Math.floor(seconds);
+        var h = Math.floor(seconds / 3600);
+        var m = Math.floor((seconds % 3600) / 60);
+        var s = seconds % 60;
+        function pad(n) { return n < 10 ? "0" + n : String(n); }
+        return (h ? h + ":" + pad(m) : String(m)) + ":" + pad(s);
+      }
+
+      function fail(text) {
+        messageEl.textContent = text;
+        messageEl.hidden = false;
+        container.classList.add("no-video");
+        document.getElementById("vp-controls").hidden = true;
+      }
+
+      function updateTime() {
+        var d = player.duration;
+        timeEl.textContent = fmt(player.currentTime) + " / " + (isFinite(d) ? fmt(d) : "0:00");
+        var pct = d ? (player.currentTime / d) * 100 : 0;
+        seek.style.setProperty("--progress", pct + "%");
+      }
+
+      /* ------------------------------------------------------- portrait shape */
+
+      /* A vertical clip gets a vertical player instead of being letterboxed
+         inside a 16:9 frame. The container is sized from the clip's own aspect
+         ratio, capped so it always fits the viewport without scrolling. */
+      var lastRatio = 0;
+
+      function applyPlayerShape() {
+        var w = player.videoWidth;
+        var h = player.videoHeight;
+        if (!w || !h) return;
+
+        var ratio = w / h;
+
+        if (ratio >= 1) {
+          container.classList.remove("is-portrait");
+          container.style.removeProperty("--vp-w");
+          container.style.removeProperty("--vp-h");
+          lastRatio = ratio;
+          return;
+        }
+
+        /* hls.js fires resize on every quality switch; only redo the maths when
+           the shape actually changed. */
+        if (container.classList.contains("is-portrait") && Math.abs(ratio - lastRatio) < 0.01) return;
+        lastRatio = ratio;
+
+        var parent = container.parentElement;
+        var parentStyle = window.getComputedStyle(parent);
+        var available = parent.clientWidth -
+          (parseFloat(parentStyle.paddingLeft) || 0) - (parseFloat(parentStyle.paddingRight) || 0);
+
+        var height = Math.min(window.innerHeight * 0.78, 900);
+        var width = height * ratio;
+        if (available > 0 && width > available) {
+          width = available;
+          height = width / ratio;
+        }
+
+        container.classList.add("is-portrait");
+        container.style.setProperty("--vp-w", Math.round(width) + "px");
+        container.style.setProperty("--vp-h", Math.round(height) + "px");
+      }
+
+      player.addEventListener("loadedmetadata", applyPlayerShape);
+      player.addEventListener("resize", applyPlayerShape);
+      window.addEventListener("resize", applyPlayerShape);
+      window.addEventListener("orientationchange", function () {
+        setTimeout(applyPlayerShape, 250);
+      });
+
+      /* --------------------------------------------------------- playback UI */
+
+      function togglePlay() {
+        if (player.paused) {
+          var p = player.play();
+          if (p && p.catch) p.catch(function (err) { console.warn("Playback blocked:", err); });
+        } else {
+          player.pause();
+        }
+      }
+
+      player.addEventListener("play", function () {
+        container.classList.add("is-playing");
+        scheduleHide();
+      });
+      player.addEventListener("pause", function () {
+        container.classList.remove("is-playing");
+        showControls();
+      });
+      player.addEventListener("ended", function () {
+        container.classList.remove("is-playing");
+        showControls();
+      });
+
+      player.addEventListener("loadedmetadata", function () {
+        seek.disabled = false;
+        updateTime();
+      });
+
+      player.addEventListener("timeupdate", function () {
+        if (isSeeking) return;
+        if (player.duration) {
+          seek.value = String(Math.round((player.currentTime / player.duration) * 1000));
+        }
+        updateTime();
+      });
+
+      player.addEventListener("volumechange", function () {
+        container.classList.toggle("is-muted", player.muted || player.volume === 0);
+      });
+
+      player.addEventListener("error", function () {
+        fail("This video could not be loaded. Check the URL in the admin panel.");
+      });
+
+      seek.addEventListener("input", function () {
+        isSeeking = true;
+        if (player.duration) {
+          player.currentTime = (Number(seek.value) / 1000) * player.duration;
+          updateTime();
+        }
+      });
+      seek.addEventListener("change", function () { isSeeking = false; });
+
+      playBtn.addEventListener("click", togglePlay);
+      muteBtn.addEventListener("click", function () { player.muted = !player.muted; });
+      fullBtn.addEventListener("click", toggleFullscreen);
+
+      /* Tap the picture itself to play/pause, like every other player. */
+      player.addEventListener("click", function (e) {
+        e.preventDefault();
+        togglePlay();
+      });
+
+      /* ---------------------------------------------------------- fullscreen */
+
+      function isFull() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement);
+      }
+
+      function toggleFullscreen() {
+        if (isFull()) {
+          (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
+          return;
+        }
+        var req = container.requestFullscreen || container.webkitRequestFullscreen;
+        if (req) {
+          var r = req.call(container);
+          if (r && r.catch) r.catch(function () {});
+        } else if (player.webkitEnterFullscreen) {
+          player.webkitEnterFullscreen(); /* iOS Safari */
+        }
+      }
+
+      ["fullscreenchange", "webkitfullscreenchange"].forEach(function (evt) {
+        document.addEventListener(evt, function () {
+          var full = isFull();
+          container.classList.toggle("is-fullscreen", full);
+          document.body.classList.toggle("has-fullscreen", full);
+        });
+      });
+
+      /* --------------------------------------------------- auto-hide controls */
+
+      function showControls() {
+        container.classList.remove("controls-hidden");
+        scheduleHide();
+      }
+
+      function scheduleHide() {
+        clearTimeout(hideTimer);
+        if (player.paused) return;
+        hideTimer = setTimeout(function () {
+          if (!player.paused && !isSeeking) container.classList.add("controls-hidden");
+        }, 2600);
+      }
+
+      ["mousemove", "touchstart", "pointerdown"].forEach(function (evt) {
+        container.addEventListener(evt, showControls, { passive: true });
+      });
+      container.addEventListener("mouseleave", scheduleHide);
+
+      /* ------------------------------------------------------------- keyboard */
+
+      document.addEventListener("keydown", function (e) {
+        var tag = (e.target.tagName || "").toLowerCase();
+        if (tag === "input" || tag === "select" || tag === "textarea") return;
+
+        switch (e.key) {
+          case " ":
+          case "k":
+            e.preventDefault(); togglePlay(); showControls(); break;
+          case "ArrowRight":
+            e.preventDefault(); player.currentTime = Math.min(player.currentTime + 5, player.duration || 0); showControls(); break;
+          case "ArrowLeft":
+            e.preventDefault(); player.currentTime = Math.max(player.currentTime - 5, 0); showControls(); break;
+          case "ArrowUp":
+            e.preventDefault(); player.muted = false; player.volume = Math.min(1, player.volume + 0.1); showControls(); break;
+          case "ArrowDown":
+            e.preventDefault(); player.volume = Math.max(0, player.volume - 0.1); showControls(); break;
+          case "m":
+            player.muted = !player.muted; showControls(); break;
+          case "f":
+            toggleFullscreen(); break;
+        }
+      });
+
+      /* ------------------------------------------------------------------ HLS */
+
+      function attachMedia(url) {
+        if (!window.eshIsHls(url)) {
+          player.src = url;
+          return;
+        }
+        if (player.canPlayType("application/vnd.apple.mpegurl")) {
+          player.src = url; /* Safari / iOS play HLS natively */
+          return;
+        }
+        var script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
+        script.onload = function () {
+          if (window.Hls && window.Hls.isSupported()) {
+            /* Segment URLs arrive already signed by the CDN Worker, so hls.js
+               is left at its defaults: it resolves each URI exactly as the
+               playlist gave it, signature and all. */
+            var hls = new window.Hls();
+            hls.loadSource(url);
+            hls.attachMedia(player);
+            window.__eshHls = hls;
+          } else {
+            fail("This browser cannot play HLS.");
+          }
+        };
+        script.onerror = function () { fail("Could not load the HLS player library."); };
+        document.head.appendChild(script);
+      }
+
+      /* ---------------------------------------------------------------- render */
+
+      function render() {
+        document.title = video.title + " — ESMERINGHOY";
+        document.getElementById("current-title").textContent = video.title;
+
+        var quality = (video.tags || []).filter(function (t) {
+          return t === "4K" || t === "HD";
+        })[0];
+        var qualityEl = document.getElementById("current-quality");
+        if (quality) { qualityEl.textContent = quality; qualityEl.hidden = false; }
+
+        document.getElementById("current-meta").innerHTML =
+          "<span>" + window.eshViews(video.views) + " views</span>" +
+          "<span>" + video.rating + "% liked</span>" +
+          "<span>" + video.duration + "</span>" +
+          "<span>Added " + window.eshAgo(video.added) + "</span>";
+
+        var tagList = document.getElementById("current-tags");
+        tagList.innerHTML = "";
+        (video.tags || []).forEach(function (tag) {
+          var chip = document.createElement("a");
+          chip.className = "tag-chip";
+          chip.href = "index.html";
+          chip.textContent = tag;
+          tagList.appendChild(chip);
+        });
+
+        var url = window.eshMediaUrl(video);
+        if (!url) {
+          fail("No video yet for this clip");
+          var note = document.getElementById("video-note");
+          note.hidden = false;
+          note.textContent = "Add the file URL in the admin panel (catalog → Video URL), " +
+            "then publish catalog.js.";
+          renderRelated();
+          return;
+        }
+
+        /* The clip and its thumbnail can both sit behind the signed CDN, so ask
+           for both signatures in one round trip before loading anything. */
+        var poster = window.eshPosterStart(video);
+        var videoKey = window.eshMediaKey(video);
+
+        if (!poster.pending) player.poster = poster.src;
+        updateTime();
+
+        window.eshSignedUrls([videoKey, poster.key].filter(Boolean)).then(function (signed) {
+          if (poster.key && signed[poster.key]) player.poster = signed[poster.key];
+          attachMedia((videoKey && signed[videoKey]) || url);
+          updateTime();
+
+          /* Counting starts only now: playback cannot begin before the signed
+             source exists, and the report is signed with that same URL. */
+          window.__eshTracking = window.EsmeringhoyTracker.attach(
+            player,
+            function () { return videoKey; },
+            window.eshTokenFor
+          );
+        });
+
+        renderRelated();
+      }
+
+      function renderRelated() {
+        var grid = document.getElementById("related-grid");
+        grid.innerHTML = "";
+
+        var tags = video.tags || [];
+        var scored = videos
+          .filter(function (v) { return v.id !== video.id; })
+          .map(function (v) {
+            var overlap = (v.tags || []).filter(function (t) {
+              return tags.indexOf(t) !== -1;
+            }).length;
+            return { video: v, score: overlap * 1000 + v.rating };
+          })
+          .sort(function (a, b) { return b.score - a.score; })
+          .slice(0, 8);
+
+        scored.forEach(function (entry) {
+          var v = entry.video;
+          var card = document.createElement("article");
+          card.className = "video-card clickable";
+          card.tabIndex = 0;
+          card.setAttribute("role", "link");
+          var poster = window.eshPosterStart(v);
+          card.innerHTML =
+            '<div class="thumb">' +
+              '<img class="poster" src="' + poster.src + '" alt="' + v.title + '" loading="lazy"' +
+                (poster.pending ? ' data-poster-key="' + poster.key + '"' : "") + '>' +
+              '<span class="badge duration">' + v.duration + '</span>' +
+              '<div class="thumb-overlay"><span class="play-icon">▶</span></div>' +
+            '</div>' +
+            '<div class="video-info">' +
+              '<h3 class="video-title">' + v.title + '</h3>' +
+              '<div class="video-meta"><span>' + window.eshViews(v.views) + ' views</span>' +
+              '<span>' + v.rating + '%</span></div>' +
+            '</div>';
+          function go() { window.location.href = "player.html?id=" + encodeURIComponent(v.id); }
+          card.addEventListener("click", go);
+          card.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+          });
+          grid.appendChild(card);
+        });
+
+        var posterKeys = scored.map(function (entry) {
+          return entry.video.poster ? window.eshMediaKeyFor(entry.video.poster) : null;
+        }).filter(Boolean);
+
+        window.eshSignedUrls(posterKeys).then(function (signed) {
+          grid.querySelectorAll("img[data-poster-key]").forEach(function (img) {
+            var key = img.getAttribute("data-poster-key");
+            if (signed[key]) img.src = signed[key];
+          });
+        });
+      }
+
+      var searchInput = document.getElementById("search-input");
+      searchInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          window.location.href = "index.html?q=" + encodeURIComponent(searchInput.value);
+        }
+      });
+
+      window.EsmeringhoyAgeGate.onUnlock(render);
+    })();
+  </script>
+</body>
+</html>

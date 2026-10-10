@@ -1,0 +1,19 @@
+# App-internal workspace state
+.freebuff/
+
+# Secrets — real keys live in Cloudflare Worker vars / env vars, never here
+.env
+.env.*
+
+# Local databases and logs
+*.db
+*.sqlite
+*.log
+
+# Dependencies and tool caches
+node_modules/
+.wrangler/
+
+# OS cruft
+Thumbs.db
+.DS_Store

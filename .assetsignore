@@ -1,0 +1,18 @@
+# Everything the browser does not need. The site itself is the handful of
+# .html/.js/.css files at the repo root.
+worker/
+tools/
+docs/
+node_modules/
+.git/
+.freebuff/
+wrangler.toml
+.gitignore
+*.md
+*.mjs
+*.log
+*.db
+*.sqlite
+.env*
+Thumbs.db
+.DS_Store

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- Keep the admin tool out of search engines -->
+  <meta name="robots" content="noindex, nofollow">
+  <title>ESMERINGHOY — Catalog Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="admin-page">
+
+  <div class="site-content">
+    <header>
+      <div class="brand-row">
+        <h1><a href="index.html">ESMERINGHOY</a></h1>
+        <div class="search-container">
+          <span class="admin-badge">Admin</span>
+          <a href="index.html" class="back-btn">View site</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="admin-main">
+      <div class="admin-bar">
+        <div class="admin-bar-head">
+          <h2 class="admin-title">Catalog</h2>
+          <p class="admin-status" id="admin-status"></p>
+        </div>
+        <div class="admin-actions">
+          <button type="button" id="btn-add" class="btn-primary">+ Add clip</button>
+          <button type="button" id="btn-copy" class="btn-ghost">Copy catalog.js</button>
+          <button type="button" id="btn-download" class="btn-ghost">Download catalog.js</button>
+          <button type="button" id="btn-reset" class="btn-ghost danger">Discard edits</button>
+        </div>
+      </div>
+
+      <div class="admin-note">
+        <strong>How publishing works.</strong> Edits are saved in this browser so you
+        can preview them instantly on the site. Visitors see nothing until you
+        <em>Download catalog.js</em> and replace the file next to this one.
+        This page needs no server — and has no login, so don't host it publicly.
+      </div>
+
+      <details class="admin-panel" id="b2-panel" open>
+        <summary>
+          <span class="panel-title">Backblaze connection</span>
+          <span class="panel-state" id="b2-panel-state"></span>
+        </summary>
+
+        <div class="panel-body">
+          <div class="field">
+            <label for="media-base">Playback base URL</label>
+            <input type="text" id="media-base" autocomplete="off"
+                   placeholder="https://f004.backblazeb2.com/file/my-bucket">
+            <p class="field-hint">
+              Where the site loads video from. Use your public B2 URL, or your
+              Cloudflare Worker URL once the CDN is set up. Clips store only the
+              path inside the bucket and resolve against this.
+            </p>
+          </div>
+
+          <div class="field">
+            <label for="media-sign-endpoint">Signed-URL endpoint (optional)</label>
+            <input type="text" id="media-sign-endpoint" autocomplete="off"
+                   placeholder="https://media.example.com/token">
+            <p class="field-hint">
+              Only for a private bucket behind the Cloudflare Worker: the
+              /token route. Leave blank if the bucket is public.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="b2-endpoint">S3 endpoint <span class="req">*</span></label>
+              <input type="text" id="b2-endpoint" autocomplete="off"
+                     placeholder="https://s3.us-west-004.backblazeb2.com">
+              <p class="field-hint">Bucket Details → Endpoint (the S3 one).</p>
+            </div>
+            <div class="field">
+              <label for="b2-bucket">Bucket <span class="req">*</span></label>
+              <input type="text" id="b2-bucket" autocomplete="off" placeholder="my-bucket">
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="b2-key-id">Key ID <span class="req">*</span></label>
+              <input type="text" id="b2-key-id" autocomplete="off" placeholder="005a1b2c3d4e5f6000000000a">
+            </div>
+            <div class="field">
+              <label for="b2-app-key">Application key <span class="req">*</span></label>
+              <input type="password" id="b2-app-key" autocomplete="new-password" placeholder="K001…">
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="b2-prefix">Upload path prefix</label>
+              <input type="text" id="b2-prefix" autocomplete="off" placeholder="clips">
+              <p class="field-hint">Files land at prefix/filename inside the bucket.</p>
+            </div>
+            <div class="field">
+              <label for="b2-region">Region</label>
+              <input type="text" id="b2-region" autocomplete="off" placeholder="us-west-004">
+              <p class="field-hint">Read from the endpoint if left blank.</p>
+            </div>
+          </div>
+
+          <label class="check">
+            <input type="checkbox" id="b2-remember">
+            Remember these keys in this browser
+          </label>
+
+          <div class="admin-actions panel-actions">
+            <button type="button" id="btn-save-b2" class="btn-primary">Save connection</button>
+            <button type="button" id="btn-forget-b2" class="btn-ghost danger">Forget keys</button>
+          </div>
+
+          <p class="field-hint" id="b2-status"></p>
+
+          <div class="admin-note subtle">
+            <strong>Uploads go straight from this browser to Backblaze.</strong>
+            Nothing is proxied through a server, and the key never leaves your
+            machine — but it is a working key while this tab is open, and Chrome
+            DevTools would show it. Use an application key limited to this one
+            bucket, keep this page off the public internet, and leave
+            <em>Remember</em> off on a shared computer.
+          </div>
+        </div>
+      </details>
+
+      <details class="admin-panel" id="stats-panel">
+        <summary>
+          <span class="panel-title">Statistics</span>
+          <span class="panel-state" id="stats-panel-state">not loaded</span>
+        </summary>
+
+        <div class="panel-body">
+          <div class="field-row">
+            <div class="field">
+              <label for="stats-endpoint">Statistics endpoint</label>
+              <input type="text" id="stats-endpoint" autocomplete="off"
+                     placeholder="https://media.example.com/stats">
+              <p class="field-hint">
+                The Worker's <code>/stats</code> route. Derived from the signed-URL
+                endpoint above; set it here only if you have moved it.
+              </p>
+            </div>
+            <div class="field">
+              <label for="stats-token">Statistics password <span class="req">*</span></label>
+              <input type="password" id="stats-token" autocomplete="new-password" placeholder="STATS_TOKEN">
+              <p class="field-hint">
+                The <code>STATS_TOKEN</code> you set on the Worker. It stays in this
+                browser — it is never written into catalog.js.
+              </p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="stats-range">Date range</label>
+              <select id="stats-range">
+                <option value="1">Today (24 hours)</option>
+                <option value="7" selected>Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="0">All time</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="stats-clip-filter">Single clip</label>
+              <select id="stats-clip-filter"><option value="">All clips</option></select>
+            </div>
+          </div>
+
+          <label class="check">
+            <input type="checkbox" id="stats-remember">
+            Remember the password in this browser
+          </label>
+
+          <label class="check">
+            <input type="checkbox" id="stats-self">
+            Don't count my own views (this browser only)
+          </label>
+
+          <div class="admin-actions panel-actions">
+            <button type="button" id="btn-stats-load" class="btn-primary">Load statistics</button>
+            <button type="button" id="btn-stats-clear" class="btn-ghost danger">Forget password</button>
+          </div>
+
+          <p class="field-hint" id="stats-status"></p>
+          <div class="admin-note subtle" id="stats-help" hidden></div>
+
+          <div id="stats-results" hidden>
+            <div class="stat-grid" id="stats-totals"></div>
+
+            <h3 class="stat-heading">Views per day</h3>
+            <div class="stat-chart" id="stats-daily"></div>
+
+            <h3 class="stat-heading">Per clip</h3>
+            <div class="stat-table-wrap">
+              <table class="stat-table" id="stats-clips">
+                <thead>
+                  <tr>
+                    <th>Clip</th>
+                    <th class="num">Views</th>
+                    <th class="num">Watch time</th>
+                    <th class="num">Avg/view</th>
+                    <th class="num">Finished</th>
+                    <th class="num">Viewers</th>
+                    <th>Last view</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p class="field-hint" id="stats-where"></p>
+
+            <div class="admin-actions panel-actions">
+              <button type="button" id="btn-stats-apply" class="btn-ghost">
+                Copy measured views into the catalog
+              </button>
+            </div>
+          </div>
+
+          <div class="admin-note subtle">
+            <strong>Where these numbers come from.</strong> Every playback session
+            reports to the CDN Worker, which stores one row per view and counts
+            forward watch time only — up to what the session could really have
+            played. The <em>Views</em> field in the clip editor is a separate,
+            human-entered number that visitors see on the site; use the button
+            above to copy measured views into it when you want them to match.
+          </div>
+        </div>
+      </details>
+
+      <div class="admin-list" id="admin-list"></div>
+    </main>
+  </div>
+
+  <!-- ---------- clip editor ---------- -->
+  <div class="editor-overlay" id="editor" hidden>
+    <div class="editor-card" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+      <h2 id="editor-title">Add clip</h2>
+
+      <form id="editor-form">
+        <div class="field">
+          <label for="f-title">Title <span class="req">*</span></label>
+          <input type="text" id="f-title" autocomplete="off" required>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="f-id">ID (URL slug)</label>
+            <input type="text" id="f-id" autocomplete="off" placeholder="auto from title">
+          </div>
+          <div class="field">
+            <label for="f-duration">Duration</label>
+            <input type="text" id="f-duration" autocomplete="off" placeholder="12:34">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="f-poster">Thumbnail URL</label>
+          <input type="text" id="f-poster" autocomplete="off" placeholder="https://… (blank = generated placeholder)">
+          <div class="thumb-preview" id="thumb-preview"></div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="f-views">Views</label>
+            <input type="number" id="f-views" min="0" step="1">
+          </div>
+          <div class="field">
+            <label for="f-rating">Rating (0–100)</label>
+            <input type="number" id="f-rating" min="0" max="100" step="1">
+          </div>
+          <div class="field">
+            <label for="f-added">Added</label>
+            <input type="date" id="f-added">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="f-tags">Tags</label>
+          <input type="text" id="f-tags" autocomplete="off" placeholder="Trending, HD, Studio">
+          <p class="field-hint">Comma separated. Tags become the category nav on the site.</p>
+        </div>
+
+        <div class="field">
+          <label for="f-video">Video URL</label>
+          <input type="text" id="f-video" autocomplete="off"
+                 placeholder="https://… or clips/myclip.mp4">
+          <p class="field-hint" id="f-video-preview"></p>
+          <p class="field-hint">
+            Paste a full URL, or just the path inside your bucket — it resolves
+            against the playback base URL. mp4 and m3u8 both work; an m3u8 gets
+            automatic quality switching.
+          </p>
+        </div>
+
+        <div class="field upload-field" id="upload-field">
+          <label>Upload a video file</label>
+          <div class="upload-drop" id="upload-drop">
+            <p class="upload-hint">Drag a video here, or</p>
+            <label class="file-btn" for="f-file">Choose a file</label>
+            <input type="file" id="f-file" accept="video/*" hidden>
+            <p class="upload-picked" id="upload-picked">No file chosen yet.</p>
+          </div>
+
+          <label class="check">
+            <input type="checkbox" id="f-grab-poster" checked>
+            Grab a thumbnail frame from the video
+          </label>
+
+          <div class="upload-actions">
+            <button type="button" id="btn-upload" class="btn-primary" disabled>Upload to Backblaze</button>
+            <button type="button" id="btn-cancel-upload" class="btn-ghost" hidden>Cancel</button>
+          </div>
+
+          <div class="upload-progress" id="upload-progress" hidden>
+            <div class="upload-bar" id="upload-bar"></div>
+          </div>
+          <p class="upload-status" id="upload-status"></p>
+        </div>
+
+        <p class="editor-error" id="editor-error" hidden></p>
+
+        <div class="editor-footer">
+          <button type="button" id="btn-cancel" class="btn-ghost">Cancel</button>
+          <button type="submit" id="btn-save" class="btn-primary">Save clip</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="catalog.js"></script>
+  <script src="data.js"></script>
+  <script src="store.js"></script>
+  <script src="signv4.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en" class="age-locked">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Adult-content signalling: RTA self-label + rating meta -->
+  <meta name="rating" content="adult">
+  <meta name="rating" content="RTA-5042-1996-1400-1577-RTA">
+  <meta name="referrer" content="no-referrer">
+  <title>ESMERINGHOY — Adult Video Streaming (18+)</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    /* Unlock before first paint so returning visitors never see a flash of
+       the age gate. agegate.js shows it when nothing is stored. */
+    try {
+      if (localStorage.getItem("esh_age_ok") === "1") {
+        document.documentElement.classList.remove("age-locked");
+      }
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+  <div class="site-content">
+    <header>
+      <div class="brand-row">
+        <h1><a href="index.html">ESMERINGHOY</a></h1>
+        <div class="search-container">
+          <input type="search" id="search-input" placeholder="Search videos, tags…"
+                 autocomplete="off" aria-label="Search videos">
+          <select id="sort-select" aria-label="Sort videos">
+            <option value="featured">Featured (catalog order)</option>
+            <option value="trending">Trending</option>
+            <option value="newest">Newest</option>
+            <option value="top">Top rated</option>
+            <option value="most-viewed">Most viewed</option>
+          </select>
+        </div>
+      </div>
+      <nav class="category-nav" id="category-nav" aria-label="Categories"></nav>
+    </header>
+
+    <main>
+      <div class="results-bar">
+        <span id="results-count"></span>
+        <span class="rta-label">RTA-5042 &middot; 18+</span>
+      </div>
+      <div class="container" id="video-grid"></div>
+      <div class="pagination-container" id="pagination-controls"></div>
+    </main>
+
+    <footer>
+      <p><strong>ESMERINGHOY</strong> — 18+ adults only. All performers depicted are adults.</p>
+      <p class="footer-note">
+        Placeholder catalog: edit <code>data.js</code> to publish your own licensed
+        content. Only distribute material you have the rights to.
+      </p>
+    </footer>
+  </div>
+
+  <script src="catalog.js"></script>
+  <script src="data.js"></script>
+  <script src="store.js"></script>
+  <script src="agegate.js"></script>
+  <script>
+    (function () {
+      var ITEMS_PER_PAGE = 12;
+      var grid = document.getElementById("video-grid");
+      var pagination = document.getElementById("pagination-controls");
+      var resultsCount = document.getElementById("results-count");
+      var categoryNav = document.getElementById("category-nav");
+      var searchInput = document.getElementById("search-input");
+      var sortSelect = document.getElementById("sort-select");
+
+      var state = { query: "", category: "Home", sort: "featured", page: 1 };
+
+      /* ---- category nav ---- */
+      function renderCategoryNav() {
+        var names = ["Home"].concat(window.ESMERINGHOY_CATEGORIES);
+        categoryNav.innerHTML = "";
+        names.forEach(function (name) {
+          var a = document.createElement("a");
+          a.href = "#";
+          a.className = "cat-link" + (name === state.category ? " active" : "");
+          a.textContent = name;
+          a.addEventListener("click", function (e) {
+            e.preventDefault();
+            state.category = name;
+            state.page = 1;
+            renderCategoryNav();
+            renderPage(1);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          });
+          categoryNav.appendChild(a);
+        });
+      }
+
+      /* ---- filtering + sorting ---- */
+      function currentList() {
+        var list = window.eshByCategory(state.category);
+        var q = state.query.trim().toLowerCase();
+        if (q) {
+          list = list.filter(function (v) {
+            return v.title.toLowerCase().indexOf(q) !== -1 ||
+              (v.tags || []).some(function (t) { return t.toLowerCase().indexOf(q) !== -1; });
+          });
+        }
+        var sorted = list.slice();
+        if (state.sort === "featured") {
+          /* Catalog order — this is the order the admin panel controls. */
+        } else if (state.sort === "newest") {
+          sorted.sort(function (a, b) { return b.added.localeCompare(a.added); });
+        } else if (state.sort === "top") {
+          sorted.sort(function (a, b) { return b.rating - a.rating; });
+        } else if (state.sort === "most-viewed") {
+          sorted.sort(function (a, b) { return b.views - a.views; });
+        } else {
+          sorted.sort(function (a, b) { return b.views * b.rating - a.views * a.rating; });
+        }
+        return sorted;
+      }
+
+      /* ---- grid ---- */
+      function buildCard(video) {
+        var card = document.createElement("article");
+        card.className = "video-card clickable";
+        card.tabIndex = 0;
+        card.setAttribute("role", "link");
+        card.setAttribute("aria-label", video.title);
+
+        var primary = (video.tags && video.tags[0]) || "";
+        var flash = (video.tags || []).filter(function (t) {
+          return t === "4K" || t === "HD";
+        })[0] || "";
+
+        /* On a private bucket the thumbnail needs a signature too; the batch
+           call in renderPage fills these in. Until then the src is a transparent
+           pixel rather than a URL the Worker would answer with 403. */
+        var poster = window.eshPosterStart(video);
+
+        card.innerHTML =
+          '<div class="thumb">' +
+            '<img class="poster" src="' + poster.src + '" alt="' + video.title + '" loading="lazy"' +
+              (poster.pending ? ' data-poster-key="' + poster.key + '"' : '') + '>' +
+            (flash ? '<span class="badge quality">' + flash + '</span>' : '') +
+            '<span class="badge duration">' + video.duration + '</span>' +
+            '<div class="thumb-overlay"><span class="play-icon">▶</span></div>' +
+          '</div>' +
+          '<div class="video-info">' +
+            '<h3 class="video-title">' + video.title + '</h3>' +
+            '<div class="video-meta">' +
+              '<span>' + window.eshViews(video.views) + ' views</span>' +
+              '<span>' + video.rating + '%</span>' +
+              '<span>' + window.eshAgo(video.added) + '</span>' +
+            '</div>' +
+            (primary ? '<span class="tag-chip">' + primary + '</span>' : '') +
+          '</div>';
+
+        function go() { window.location.href = "player.html?id=" + encodeURIComponent(video.id); }
+        card.addEventListener("click", go);
+        card.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+        });
+        return card;
+      }
+
+      function renderPage(page) {
+        state.page = page;
+        grid.innerHTML = "";
+        var list = currentList();
+        var totalPages = Math.max(1, Math.ceil(list.length / ITEMS_PER_PAGE));
+
+        if (list.length === 0) {
+          grid.innerHTML = '<p class="no-results">No videos found matching your search.</p>';
+          pagination.innerHTML = "";
+          resultsCount.textContent = "0 results";
+          return;
+        }
+        if (page > totalPages) page = state.page = totalPages;
+
+        var start = (page - 1) * ITEMS_PER_PAGE;
+        list.slice(start, start + ITEMS_PER_PAGE).forEach(function (v) {
+          grid.appendChild(buildCard(v));
+        });
+
+        resultsCount.textContent = list.length + (list.length === 1 ? " video" : " videos") +
+          (state.category !== "Home" ? " in " + state.category : "");
+
+        signVisiblePosters();
+        renderPagination(totalPages);
+      }
+
+      /* One signed-URL request per page of thumbnails, not one per card. */
+      function signVisiblePosters() {
+        var images = grid.querySelectorAll("img[data-poster-key]");
+        if (!images.length) return;
+        var keys = [].map.call(images, function (img) {
+          return img.getAttribute("data-poster-key");
+        });
+        window.eshSignedUrls(keys).then(function (signed) {
+          [].forEach.call(images, function (img) {
+            var key = img.getAttribute("data-poster-key");
+            if (signed[key]) img.src = signed[key];
+          });
+        });
+      }
+
+      function pageButton(label, page, opts) {
+        opts = opts || {};
+        var btn = document.createElement("button");
+        btn.className = "page-btn" + (opts.active ? " active" : "");
+        btn.textContent = label;
+        btn.disabled = !!opts.disabled;
+        btn.addEventListener("click", function () {
+          renderPage(page);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+        return btn;
+      }
+
+      function renderPagination(totalPages) {
+        pagination.innerHTML = "";
+        if (totalPages <= 1) return;
+
+        pagination.appendChild(pageButton("« Prev", state.page - 1, { disabled: state.page === 1 }));
+
+        var pages = [];
+        for (var i = 1; i <= totalPages; i++) {
+          if (i === 1 || i === totalPages || Math.abs(i - state.page) <= 1) pages.push(i);
+          else if (pages[pages.length - 1] !== "…") pages.push("…");
+        }
+        pages.forEach(function (p) {
+          if (p === "…") {
+            var span = document.createElement("span");
+            span.className = "page-gap";
+            span.textContent = "…";
+            pagination.appendChild(span);
+          } else {
+            pagination.appendChild(pageButton(p, p, { active: p === state.page }));
+          }
+        });
+
+        pagination.appendChild(pageButton("Next »", state.page + 1, { disabled: state.page === totalPages }));
+      }
+
+      /* ---- events ---- */
+      var searchTimer;
+      searchInput.addEventListener("input", function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          state.query = searchInput.value;
+          renderPage(1);
+        }, 180);
+      });
+      sortSelect.addEventListener("change", function () {
+        state.sort = sortSelect.value;
+        renderPage(1);
+      });
+
+      /* ---- boot: only after the visitor passes the age gate ---- */
+      window.EsmeringhoyAgeGate.onUnlock(function () {
+        var q = new URLSearchParams(window.location.search).get("q");
+        if (q) {
+          searchInput.value = q;
+          state.query = q;
+        }
+        renderCategoryNav();
+        renderPage(1);
+      });
+    })();
+  </script>
+</body>
+</html>

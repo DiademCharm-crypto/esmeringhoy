@@ -1,0 +1,46 @@
+# ============================================================================
+# ESMERINGHOY — CDN WORKER + STATISTICS + STATIC SITE
+# ----------------------------------------------------------------------------
+# Deploy:  npx wrangler deploy        (full walkthrough: docs/DEPLOY.md)
+# Local:   npx wrangler dev           (serves everything on :8787)
+#
+# One Worker serves the whole site: the static files ride along as assets, and
+# /token, /track, /stats and signed media paths are handled in code.
+# .assetsignore keeps tests, docs and tools out of the upload.
+
+name = "esmeringhoy"
+main = "worker/b2-cdn-worker.js"
+compatibility_date = "2026-10-10"
+
+[assets]
+directory = "."
+binding = "ASSETS"
+
+[vars]
+# Origins allowed to call /token, /track and /stats (comma-separated).
+# Replace with your domain once it is live, e.g. https://yourdomain.com
+SITE_ORIGINS = "http://localhost:8787"
+
+# Optional tuning (defaults shown):
+# TOKEN_TTL = "21600"     # seconds a signed URL stays valid
+# CACHE_TTL = "86400"     # edge cache seconds for segments
+# TRACKING  = "on"        # "off" disables view recording entirely
+
+# Once your domain's DNS zone is on this Cloudflare account, point the Worker
+# at it (then set SITE_ORIGINS above to the same origin and redeploy):
+# routes = [{ pattern = "yourdomain.com", custom_domain = true }]
+
+# Statistics database. Create once with:
+#   npx wrangler d1 create esh-stats
+# then paste the database_id it prints:
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "esh-stats"
+# database_id = "PASTE-THE-DATABASE-ID"
+
+# Secrets — never put these in this file:
+#   npx wrangler secret put B2_KEY_ID           (Backblaze key ID)
+#   npx wrangler secret put B2_APPLICATION_KEY  (Backblaze application key)
+#   npx wrangler secret put MEDIA_SIGNING_KEY   (openssl rand -hex 32)
+#   npx wrangler secret put STATS_TOKEN         (openssl rand -hex 24)
+# BUCKET_NAME goes under [vars] — it is not secret.
