@@ -15,6 +15,14 @@ compatibility_date = "2026-10-10"
 [assets]
 directory = "."
 binding = "ASSETS"
+# The pages are linked by name (player.html?id=..., admin.html, index.html). The
+# default "auto-trailing-slash" answers every one of those with a 307 to the
+# extensionless path — an extra round trip on each navigation, and a hard stop
+# for any client that does not follow redirects. "none" serves the named file.
+html_handling = "none"
+# "none" (the default) also matters for the API: a path that is not an asset
+# must reach the Worker, because that is where /token, /track, /stats and the
+# signed media routes live. An SPA fallback would swallow them.
 
 [vars]
 # Origins allowed to call /token, /track and /stats (comma-separated).

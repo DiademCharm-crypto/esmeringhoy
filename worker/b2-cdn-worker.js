@@ -347,32 +347,36 @@ const SESSION_ID = /^[A-Za-z0-9_-]{8,64}$/;
 /* A view is a session that really started playing; a bounce is not a view. */
 const EVENTS = new Set(["start", "progress", "end"]);
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS play_sessions (
-  id TEXT PRIMARY KEY,
-  key TEXT NOT NULL,
-  started_at INTEGER NOT NULL,
-  last_seen_at INTEGER NOT NULL,
-  watched_seconds REAL NOT NULL DEFAULT 0,
-  position REAL NOT NULL DEFAULT 0,
-  duration REAL,
-  completed INTEGER NOT NULL DEFAULT 0,
-  events INTEGER NOT NULL DEFAULT 0,
-  viewer TEXT,
-  country TEXT,
-  device TEXT,
-  referrer TEXT
-);
-CREATE INDEX IF NOT EXISTS play_sessions_started ON play_sessions (started_at);
-CREATE INDEX IF NOT EXISTS play_sessions_key ON play_sessions (key, started_at);
-`;
+/* One statement per string, run through prepare(). D1's exec() treats every
+   LINE as a whole statement and rejects anything that spans lines ("incomplete
+   input"), so a pretty-printed multi-line CREATE TABLE passes against a plain
+   SQLite connection and fails on the real edge. Keeping each statement on one
+   line and out of exec() is what makes this work in both. */
+const SCHEMA = [
+  "CREATE TABLE IF NOT EXISTS play_sessions (" +
+    "id TEXT PRIMARY KEY, " +
+    "key TEXT NOT NULL, " +
+    "started_at INTEGER NOT NULL, " +
+    "last_seen_at INTEGER NOT NULL, " +
+    "watched_seconds REAL NOT NULL DEFAULT 0, " +
+    "position REAL NOT NULL DEFAULT 0, " +
+    "duration REAL, " +
+    "completed INTEGER NOT NULL DEFAULT 0, " +
+    "events INTEGER NOT NULL DEFAULT 0, " +
+    "viewer TEXT, " +
+    "country TEXT, " +
+    "device TEXT, " +
+    "referrer TEXT)",
+  "CREATE INDEX IF NOT EXISTS play_sessions_started ON play_sessions (started_at)",
+  "CREATE INDEX IF NOT EXISTS play_sessions_key ON play_sessions (key, started_at)"
+];
 
-/* One CREATE TABLE round trip per isolate, not per request. */
+/* One schema round trip per isolate, not per request. */
 let schemaReady = false;
 
 async function ensureSchema(env) {
   if (!env.DB || schemaReady) return;
-  await env.DB.exec(SCHEMA);
+  for (const statement of SCHEMA) await env.DB.prepare(statement).run();
   schemaReady = true;
 }
 
@@ -796,6 +800,22 @@ async function handleRequest(request, env, ctx) {
   if (env.ASSETS && (request.method === "GET" || request.method === "HEAD")) {
     const asset = await env.ASSETS.fetch(request);
     if (asset.status !== 404) return asset;
+
+    /* wrangler.toml sets html_handling = "none" so that the pages linked as
+       player.html / admin.html serve directly instead of answering 307 to the
+       extensionless path. The other side of that setting is that the asset
+       server matches names exactly: "/" is not index.html and "/player" is not
+       player.html. Resolve both here, which costs one extra lookup only for
+       paths that already missed the assets. */
+    if (!/\.[A-Za-z0-9]+$/.test(url.pathname)) {
+      const candidate = url.pathname.endsWith("/")
+        ? url.pathname + "index.html"
+        : url.pathname + ".html";
+      const target = new URL(url.href);
+      target.pathname = candidate;
+      const retried = await env.ASSETS.fetch(new Request(target, request));
+      if (retried.status !== 404) return retried;
+    }
   }
 
   /* ---------------------------------------------------------------- media -- */

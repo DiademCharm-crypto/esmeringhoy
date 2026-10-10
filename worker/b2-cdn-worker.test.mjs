@@ -824,12 +824,20 @@ Date.now = realDateNow;
 console.log("\nStatic assets beside the API");
 
 /* The deploy shape: site files uploaded next to the Worker. An asset hit is
-   served; anything else falls through to the media/signature path. */
+   served; anything else falls through to the media/signature path.
+
+   This deliberately has no "/" entry: with html_handling = "none" the real
+   asset server matches names exactly, so "/" and "/player" are misses that the
+   Worker has to resolve. The lookups are recorded so the resolution can be
+   asserted rather than inferred from a 200. */
 function fakeAssets(files) {
+  const seen = [];
   return {
+    seen,
     async fetch(request) {
-      const pathname = new URL(request.url).pathname;
-      const file = files[pathname];
+      const url = new URL(request.url);
+      seen.push(url.pathname + url.search);
+      const file = files[url.pathname];
       if (!file) return new Response("no such asset", { status: 404 });
       return new Response(file.body, { status: 200, headers: { "Content-Type": file.type } });
     }
@@ -838,7 +846,8 @@ function fakeAssets(files) {
 
 const assetsEnv = Object.assign({}, env, {
   ASSETS: fakeAssets({
-    "/": { body: "<!doctype html><title>home</title>", type: "text/html; charset=utf-8" },
+    "/index.html": { body: "<!doctype html><title>home</title>", type: "text/html; charset=utf-8" },
+    "/player.html": { body: "<!doctype html><title>player</title>", type: "text/html; charset=utf-8" },
     "/admin.html": { body: "<!doctype html><title>admin</title>", type: "text/html; charset=utf-8" }
   })
 });
@@ -851,6 +860,21 @@ await check("serves the static site beside the API routes", async () => {
 
   const admin = await worker.fetch(new Request("https://media.example.com/admin.html"), assetsEnv, {});
   assert.equal(admin.status, 200);
+  assert.match(await admin.text(), /admin/);
+});
+
+await check("resolves the extensionless form of a page, query string intact", async () => {
+  const pretty = await worker.fetch(new Request("https://media.example.com/player?id=7"), assetsEnv, {});
+  assert.equal(pretty.status, 200, "status " + pretty.status);
+  assert.match(await pretty.text(), /player/);
+  assert.ok(
+    assetsEnv.ASSETS.seen.includes("/player.html?id=7"),
+    "the .html lookup dropped the query: " + assetsEnv.ASSETS.seen.join(", ")
+  );
+
+  /* And a miss stays a miss: nothing is invented for a path with no file. */
+  const missing = await worker.fetch(new Request("https://media.example.com/nope-page"), assetsEnv, {});
+  assert.notEqual(missing.status, 200, "a missing page answered " + missing.status);
 });
 
 await check("a signed media URL falls through the assets to the signature check", async () => {

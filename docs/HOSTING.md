@@ -100,6 +100,10 @@ see [VIDEO-PIPELINE.md](VIDEO-PIPELINE.md).
 Backblaze does not bill for egress to Cloudflare, and Cloudflare does not bill
 for egress to visitors, which is what makes this combination free at any volume.
 
+This part walks through the dashboard. To put the same Worker, the site files and
+the statistics database live on your own domain from the command line, follow
+[DEPLOY.md](DEPLOY.md) instead — the two describe the same Worker.
+
 1. Cloudflare dashboard → **Workers & Pages** → *Create* → *Worker*. Name it
    something like `esh-media`.
 2. Replace the starter code with the entire contents of
