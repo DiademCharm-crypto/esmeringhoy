@@ -8,8 +8,11 @@
    here is the code that ships.
 
    Start the stand-in first (it ships in this repo, no account needed):
-     node tools/b2-stand-in.mjs 8090 /path/to/an/hls/folder
-   …or seed nothing and just exercise the signature/authorisation paths.
+     node tools/test-fixture.mjs /tmp/hls      # synthetic ladder, no ffmpeg
+     node tools/b2-stand-in.mjs 8090 /tmp/hls
+   …or seed nothing and just exercise the signature/authorisation paths: the
+   checks that fetch playlist and segment objects (nine of them) need a ladder,
+   and report honestly rather than being skipped.
 
    It covers: signature verification (missing / expired / tampered), the /token
    exchange and its origin allowlist, HLS playlist rewriting including nested

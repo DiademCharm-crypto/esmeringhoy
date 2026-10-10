@@ -12,6 +12,7 @@ docs/
 node_modules/
 .wrangler/
 .git/
+.github/
 .freebuff/
 .secrets/
 wrangler.toml

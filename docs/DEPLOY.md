@@ -163,6 +163,39 @@ reach the Worker, because that is where the API lives. The Worker resolves the
 two cases the asset server then misses — `/` to `index.html`, `/player` to
 `player.html` — so both link styles work.
 
+## Deploying from CI
+
+`.github/workflows/deploy.yml` runs the suites on every push to `main` and
+deploys only if they pass. It needs two repository secrets:
+
+| Secret | Where to get it |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | dash.cloudflare.com → **My Profile → API Tokens → Create Token → "Edit Cloudflare Workers"** template |
+| `CLOUDFLARE_ACCOUNT_ID` | printed by `npx wrangler whoami` |
+
+Worker secrets (`MEDIA_SIGNING_KEY`, `STATS_TOKEN`, the B2 pair) are **not**
+part of CI — they live in Cloudflare and survive every deploy, so a missing
+token never breaks the live site. Without those two secrets the `Deploy` job
+fails with an explicit message rather than silently skipping.
+
+## Running the suites
+
+The Worker suite drives the real handler against the real B2 stand-in, so it
+needs a seeded ladder. The fixture is synthetic — the checks depend on playlist
+structure and object keys, never on video content — so no `ffmpeg` and no
+committed media are involved:
+
+```bash
+node tools/test-fixture.mjs /tmp/hls
+node tools/b2-stand-in.mjs 8090 /tmp/hls &
+node worker/b2-cdn-worker.test.mjs     # 58 checks
+node tools/sigv4.test.mjs              # 11 checks
+```
+
+Seeding nothing still runs the signature and authorisation checks; the nine
+checks that fetch playlist and segment objects then fail with a clear message,
+because they have nothing to fetch.
+
 ## Local development
 
 Wrangler watches the assets directory, and its own D1/cache state lives in
