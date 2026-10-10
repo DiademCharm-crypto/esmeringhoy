@@ -1,18 +1,30 @@
 # Everything the browser does not need. The site itself is the handful of
 # .html/.js/.css files at the repo root.
+#
+# [assets] directory = "." uploads the whole repo root, and this list is the
+# only thing standing between the site and the rest of it. Wrangler does NOT
+# skip dot-directories on its own: without the .wrangler/ and .git/ lines below,
+# the dev server's own build output gets published — and
+# /.wrangler/tmp/deploy-*/b2-cdn-worker.js really is downloadable.
 worker/
 tools/
 docs/
 node_modules/
+.wrangler/
 .git/
 .freebuff/
+.secrets/
 wrangler.toml
 .gitignore
+.assetsignore
 *.md
 *.mjs
+*.map
 *.log
 *.db
 *.sqlite
+*.sqlite-wal
+*.sqlite-shm
 .env*
 Thumbs.db
 .DS_Store

@@ -26,25 +26,27 @@ html_handling = "none"
 
 [vars]
 # Origins allowed to call /token, /track and /stats (comma-separated).
-# Replace with your domain once it is live, e.g. https://yourdomain.com
-SITE_ORIGINS = "http://localhost:8787"
+# Every origin the site is actually browsed from has to be here.
+# The workers.dev origin is here so the admin panel and the player work on the
+# interim URL too; drop it once the custom domain is the only way in.
+SITE_ORIGINS = "https://esmeringhoy.eu.cc,https://www.esmeringhoy.eu.cc,https://esmeringhoy.esmeringhoy.workers.dev"
 
 # Optional tuning (defaults shown):
 # TOKEN_TTL = "21600"     # seconds a signed URL stays valid
 # CACHE_TTL = "86400"     # edge cache seconds for segments
 # TRACKING  = "on"        # "off" disables view recording entirely
 
-# Once your domain's DNS zone is on this Cloudflare account, point the Worker
-# at it (then set SITE_ORIGINS above to the same origin and redeploy):
-# routes = [{ pattern = "yourdomain.com", custom_domain = true }]
+# Custom domain. Works only once esmeringhoy.eu.cc is an ACTIVE zone in this
+# Cloudflare account, which is what the nameserver change at Gname achieves:
+# routes = [
+#   { pattern = "esmeringhoy.eu.cc", custom_domain = true },
+#   { pattern = "www.esmeringhoy.eu.cc", custom_domain = true }
+# ]
 
-# Statistics database. Create once with:
-#   npx wrangler d1 create esh-stats
-# then paste the database_id it prints:
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "esh-stats"
-# database_id = "PASTE-THE-DATABASE-ID"
+[[d1_databases]]
+binding = "DB"
+database_name = "esh-stats"
+database_id = "a11a12a5-e9a2-49c3-a144-334f2f7cc0b6"
 
 # Secrets — never put these in this file:
 #   npx wrangler secret put B2_KEY_ID           (Backblaze key ID)

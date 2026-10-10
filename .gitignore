@@ -4,6 +4,9 @@
 # Secrets — real keys live in Cloudflare Worker vars / env vars, never here
 .env
 .env.*
+.secrets/
+*.pem
+*.key
 
 # Local databases and logs
 *.db
