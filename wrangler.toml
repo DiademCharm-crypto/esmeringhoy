@@ -12,6 +12,22 @@ name = "esmeringhoy"
 main = "worker/b2-cdn-worker.js"
 compatibility_date = "2026-10-10"
 
+# One canonical origin. With routes present wrangler disables workers.dev by
+# default; saying so outright keeps it that way and stops the warning. Set this
+# to true, or add the origin below, if the workers.dev URL is ever wanted back.
+workers_dev = false
+
+# Custom domain, and it has to stay ABOVE [vars]: in TOML a key written after a
+# table header belongs to that table, and inside [vars] these lines silently
+# become env.routes — a variable passed to the Worker — instead of triggers.
+# Cloudflare creates the DNS records and the certificate from these two lines,
+# so nothing is ever added by hand in the DNS tab, and a hand-made CNAME on
+# either hostname would block the custom domain outright.
+routes = [
+  { pattern = "esmeringhoy.eu.cc", custom_domain = true },
+  { pattern = "www.esmeringhoy.eu.cc", custom_domain = true }
+]
+
 [assets]
 directory = "."
 binding = "ASSETS"
@@ -26,22 +42,14 @@ html_handling = "none"
 
 [vars]
 # Origins allowed to call /token, /track and /stats (comma-separated).
-# Every origin the site is actually browsed from has to be here.
-# The workers.dev origin is here so the admin panel and the player work on the
-# interim URL too; drop it once the custom domain is the only way in.
-SITE_ORIGINS = "https://esmeringhoy.eu.cc,https://www.esmeringhoy.eu.cc,https://esmeringhoy.esmeringhoy.workers.dev"
+# Every origin the site is actually browsed from has to be here — a missing
+# entry is the usual reason a player loads and then refuses to sign anything.
+SITE_ORIGINS = "https://esmeringhoy.eu.cc,https://www.esmeringhoy.eu.cc"
 
 # Optional tuning (defaults shown):
 # TOKEN_TTL = "21600"     # seconds a signed URL stays valid
 # CACHE_TTL = "86400"     # edge cache seconds for segments
 # TRACKING  = "on"        # "off" disables view recording entirely
-
-# Custom domain. Works only once esmeringhoy.eu.cc is an ACTIVE zone in this
-# Cloudflare account, which is what the nameserver change at Gname achieves:
-# routes = [
-#   { pattern = "esmeringhoy.eu.cc", custom_domain = true },
-#   { pattern = "www.esmeringhoy.eu.cc", custom_domain = true }
-# ]
 
 [[d1_databases]]
 binding = "DB"
