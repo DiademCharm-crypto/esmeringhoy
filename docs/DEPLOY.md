@@ -149,6 +149,34 @@ The last one returning `200` with a `url` field means signing works. Then play a
 clip in a browser and watch the admin panel's Statistics tab tick up — that is
 the end-to-end path: page → `/token` → signed media → `/track` → D1 → `/stats`.
 
+## Part 7 — lock down the admin panel
+
+`/admin.html` and `/stats` are protected by **Cloudflare Access**, which sits in
+front of the Worker: an unauthenticated request never reaches the site code. The
+statistics password remains as the second gate, not the only one.
+
+```bash
+node tools/access-setup.mjs                   # read-only: print what exists
+node tools/access-setup.mjs --apply           # create org, applications, policy
+node tools/access-setup.mjs --apply --verify  # …and prove the gate
+```
+
+It reads its token from `.secrets/cf-api-token` (gitignored, never uploaded).
+The token needs these account-scoped permissions: **Access: Apps and Policies —
+Edit**, **Access: Organizations, Identity Providers, and Groups — Edit**, and for
+`--verify` **Access: Service Tokens — Edit**. If the account has never opened
+Zero Trust, do that once (free plan, pick a team name) and re-run.
+
+Covered: `/admin.html` and `/admin` on the apex and `www` — both spellings,
+because the Worker resolves the extensionless path too — plus `/stats`. Left
+open on purpose: `/`, `/player.html`, `/catalog.js`, `/token`, `/track` and
+signed media. Login is an emailed one-time PIN; change the allowed addresses with
+`ADMIN_EMAILS=you@example.com` (comma-separated).
+
+`--verify` creates a temporary service token, probes every path with and without
+it, and deletes the token and its policies again. That is the check that the gate
+is real rather than merely configured.
+
 ## What gets uploaded
 
 `[assets] directory = "."` uploads the repo root, filtered by
