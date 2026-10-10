@@ -275,6 +275,19 @@ function originAllowed(env, origin) {
   return list.includes("*") || list.includes(origin);
 }
 
+/* Whether a request may be treated as coming from the site itself. Browsers
+   send Origin on cross-origin calls, but a same-origin GET sends neither an
+   Origin nor — with referrer policy no-referrer, which the pages set — a
+   Referer, and that is exactly how the player asks for a signed URL. Refusing
+   "no origin" outright would refuse the site's own pages, so a missing origin
+   is accepted unless Sec-Fetch-Site says the request came from another site
+   (that header is set by the browser regardless of referrer policy). */
+function callerAllowed(env, request) {
+  const origin = callerOrigin(request);
+  if (origin) return originAllowed(env, origin);
+  return request.headers.get("Sec-Fetch-Site") !== "cross-site";
+}
+
 function corsHeaders(env, origin, extra) {
   const headers = new Headers(extra);
   if (origin && originAllowed(env, origin)) {
@@ -495,8 +508,10 @@ async function trackRequest(request, env, ctx, origin) {
   }
 
   /* Only the site may report. A signed link is the credential; without one the
-     endpoint would be a free "inflate my numbers" button. */
-  if (origin && !originAllowed(env, origin)) {
+     endpoint would be a free "inflate my numbers" button. A side-effect of the
+     same-origin rule above: the beacons the tracker sends carry no Origin on
+     some paths, so the shared check is used here too. */
+  if (!callerAllowed(env, request)) {
     return jsonResponse(env, null, { error: "origin_not_allowed" }, 403);
   }
 
@@ -599,11 +614,14 @@ async function statsRequest(request, env, origin, url) {
     return jsonResponse(env, origin, { error: "method_not_allowed" }, 405);
   }
   /* Same allowlist as /token: your numbers are not readable from any origin, and
-     the password is a second lock rather than the only one. */
-  if (!originAllowed(env, origin)) {
+     the password is a second lock rather than the only one. The panel itself
+     asks from the site's own origin, so a same-origin GET carries no Origin. */
+  if (!callerAllowed(env, request)) {
     return jsonResponse(env, null, {
       error: "origin_not_allowed",
-      message: "Add " + (origin || "(no origin)") + " to SITE_ORIGINS."
+      message: origin
+        ? "Add " + origin + " to SITE_ORIGINS."
+        : "Cross-site request with no Origin; add the calling origin to SITE_ORIGINS."
     }, 403);
   }
   if (!env.STATS_TOKEN) {
@@ -743,10 +761,12 @@ async function handleRequest(request, env, ctx) {
   /* ---------------------------------------------------------------- token -- */
 
   if (url.pathname === "/token" || url.pathname === "/token/") {
-    if (!originAllowed(env, requestOrigin)) {
+    if (!callerAllowed(env, request)) {
       return jsonResponse(env, null, {
         error: "origin_not_allowed",
-        message: "Add " + (requestOrigin || "(no origin)") + " to SITE_ORIGINS."
+        message: requestOrigin
+          ? "Add " + requestOrigin + " to SITE_ORIGINS."
+          : "Cross-site request with no Origin; add the calling origin to SITE_ORIGINS."
       }, 403);
     }
     if (!env.MEDIA_SIGNING_KEY) {

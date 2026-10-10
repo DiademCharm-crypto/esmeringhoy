@@ -8,6 +8,10 @@
 *.pem
 *.key
 
+# Local dev overrides for wrangler (stand-in endpoints, fake keys)
+.dev.vars
+.dev.vars.*
+
 # Local databases and logs
 *.db
 *.sqlite

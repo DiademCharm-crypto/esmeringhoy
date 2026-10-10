@@ -39,9 +39,12 @@
    a short-lived signed URL instead of hitting the bucket directly. Leave it
    blank and nothing is signed, which is what a public bucket wants.
    -------------------------------------------------------------------------- */
+/* Published wiring for esmeringhoy.eu.cc: the same Worker serves the site and
+   the media, so a relative endpoint is the whole address. It keeps www and a
+   local `wrangler dev` run working with no CORS and no hostname baked in. */
 window.ESMERINGHOY_MEDIA = {
   b2BaseUrl: "",
-  signEndpoint: ""
+  signEndpoint: "/token"
 };
 
 window.ESMERINGHOY_CATEGORIES = [

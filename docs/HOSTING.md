@@ -148,9 +148,13 @@ its thumbnail in one round trip, and lists of thumbnails are signed in a single
 batched request per page. Leave it empty and everything falls back to plain URLs,
 which is what a public bucket wants — so this is safe to ship in either mode.
 
-The Worker checks the requesting origin against `SITE_ORIGINS` before signing.
-`/token` is the only unauthenticated endpoint, and it only ever returns a URL for
-the path asked for, valid until `TOKEN_TTL`.
+The Worker checks the caller against `SITE_ORIGINS` before signing. The site's
+own pages are same-origin, so their requests carry no `Origin` header — and the
+pages set `referrer: no-referrer`, so no `Referer` either. Those are accepted,
+while a request the browser marks `Sec-Fetch-Site: cross-site` is refused, which
+is what stops another site from signing your media. `/token` is the only
+unauthenticated endpoint, and it only ever returns a URL for the path asked for,
+valid until `TOKEN_TTL`.
 
 ### Verified behaviour
 

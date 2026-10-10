@@ -234,6 +234,14 @@ answering. Persist the state somewhere else:
 npx wrangler dev --persist-to ../esh-state
 ```
 
+To drive the real handler against the shipped B2 stand-in instead of Backblaze,
+put the fake bindings in `.dev.vars` (gitignored, dev-only, and it overrides
+`[vars]`): `BUCKET_NAME`, the `B2_API_URL` / `B2_DOWNLOAD_URL` pair pointing at
+the stand-in, a throwaway `MEDIA_SIGNING_KEY`, and a `SITE_ORIGINS` that lists
+the host you browse at. Note that wrangler dev simulates the production
+hostname, so a POST from the browser reaches the Worker carrying that origin —
+list it too, or every beacon is refused as cross-site.
+
 ## Troubleshooting
 
 | Symptom | Cause |

@@ -132,6 +132,22 @@ await check("refuses an origin that is not on the list", async () => {
   assert.equal(body.error, "origin_not_allowed");
 });
 
+await check("answers the site's own same-origin fetch, which sends no Origin and no Referer", async () => {
+  /* The shape the player produces for every clip: a same-origin GET, and the
+     pages set referrer no-referrer, so there is neither an Origin nor a
+     Referer for the allowlist to read. Refusing that breaks the whole player. */
+  const response = await call("/token?p=" + encodeURIComponent(PLAYLIST), { headers: { "Sec-Fetch-Site": "same-origin" } });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.ok(body.urls && body.urls[PLAYLIST], "no signed URL for the clip");
+});
+
+await check("refuses a cross-site request that arrives without an Origin", async () => {
+  const response = await call("/token?p=" + encodeURIComponent(PLAYLIST), { headers: { "Sec-Fetch-Site": "cross-site" } });
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error, "origin_not_allowed");
+});
+
 await check("refuses a token request with no path", async () => {
   const response = await call("/token", { headers: { Origin: ORIGIN } });
   assert.equal(response.status, 400);
@@ -686,6 +702,16 @@ await check("says how to bind a database when none is bound", async () => {
 
 await check("refuses /stats from an origin that is not the site", async () => {
   const response = await statsCall("/stats", { headers: { Authorization: "Bearer " + STATS_TOKEN, Origin: "https://evil.example" } });
+  assert.equal(response.status, 403);
+});
+
+await check("answers the panel's same-origin fetch, which sends no Origin", async () => {
+  const response = await statsCall("/stats", { headers: { Authorization: "Bearer " + STATS_TOKEN, "Sec-Fetch-Site": "same-origin" } });
+  assert.equal(response.status, 200);
+});
+
+await check("refuses a cross-site /stats request that arrives without an Origin", async () => {
+  const response = await statsCall("/stats", { headers: { Authorization: "Bearer " + STATS_TOKEN, "Sec-Fetch-Site": "cross-site" } });
   assert.equal(response.status, 403);
 });
 
