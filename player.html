@@ -7,6 +7,7 @@
   <meta name="rating" content="RTA-5042-1996-1400-1577-RTA">
   <meta name="referrer" content="no-referrer">
   <title>ESMERINGHOY — Watch (18+)</title>
+  <link rel="icon" type="image/svg+xml" href="assets/branding/favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script>
     try {
@@ -21,22 +22,13 @@
   <div class="site-content">
     <header>
       <div class="brand-row">
-        <h1><a href="index.html">ESMERINGHOY</a></h1>
-        <div class="search-container">
-          <input type="search" id="search-input" placeholder="Search videos, tags…"
-                 autocomplete="off" aria-label="Search videos">
-          <a href="index.html" class="back-btn">← Back to home</a>
-        </div>
+        <h1 class="brand-heading"><a href="index.html" aria-label="ESMERINGHOY — home"><img class="brand-logo" src="assets/branding/esmeringhoy-logo-horizontal.svg" alt="ESMERINGHOY" width="1097" height="200"></a></h1>
+        <a href="index.html" class="back-btn">← Back to home</a>
       </div>
     </header>
 
     <main>
       <section class="player-wrapper">
-        <div class="player-heading">
-          <h2 id="current-title" class="featured-title">Loading…</h2>
-          <span id="current-quality" class="badge quality" hidden></span>
-        </div>
-
         <div class="video-container" id="video-container">
           <video id="player" class="vp-video" playsinline preload="metadata"></video>
 
@@ -65,28 +57,96 @@
           <p class="vp-message" id="vp-message" hidden></p>
         </div>
 
+        <div class="player-heading">
+          <h2 id="current-title" class="featured-title">Loading…</h2>
+          <span id="current-quality" class="badge quality" hidden></span>
+        </div>
+        <p class="video-description" id="current-description" hidden></p>
+
+        <div class="engagement-bar">
+          <span class="live-views" id="live-views" aria-live="polite">0 views</span>
+          <div class="vote-bar" aria-label="Rate this video">
+            <button type="button" class="vote-btn" id="vote-like" aria-pressed="false">
+              <span class="vote-label">Like</span><span class="vote-count" id="like-count">0</span>
+            </button>
+            <button type="button" class="vote-btn" id="vote-dislike" aria-pressed="false">
+              <span class="vote-label">Dislike</span><span class="vote-count" id="dislike-count">0</span>
+            </button>
+          </div>
+        </div>
+
+        <section class="clip-section" id="clip-section" hidden>
+          <h3 class="section-label">Clips <span class="section-count" id="clip-count"></span></h3>
+          <div class="clip-strip" id="clip-strip" role="tablist" aria-label="Clips in this title"></div>
+        </section>
+
+        <section class="gallery-section" id="gallery-section" hidden>
+          <div class="section-head">
+            <h3 class="section-label">Gallery <span class="section-count" id="gallery-count"></span></h3>
+            <button type="button" class="section-toggle" id="gallery-toggle" aria-expanded="false" aria-controls="gallery-grid">Show photos</button>
+          </div>
+          <div class="gallery-grid" id="gallery-grid"></div>
+        </section>
+
+        <section class="more-section" id="more-section" hidden>
+          <h3 class="section-label">More like this</h3>
+          <div class="more-grid" id="more-grid"></div>
+        </section>
+
+        <section class="comments-section" id="comments-section">
+          <div class="section-head">
+            <h3 class="section-label">Comments <span class="section-count" id="comment-count" hidden></span></h3>
+            <button type="button" class="section-toggle" id="comments-toggle" aria-expanded="false" aria-controls="comments-panel">Add a comment</button>
+          </div>
+
+          <div class="comments-panel" id="comments-panel" hidden>
+            <div class="comment-identity">
+              <label for="comment-name">Your name</label>
+              <div class="comment-name-row">
+                <input type="text" id="comment-name" maxlength="32" autocomplete="off" placeholder="Anonymous12345">
+                <button type="button" class="btn-ghost small" id="comment-name-new">New name</button>
+              </div>
+              <p class="comment-hint">Saved in this browser. Change it any time.</p>
+            </div>
+
+            <div class="comment-compose">
+              <textarea id="comment-body" rows="3" maxlength="1000" placeholder="Write a comment…"></textarea>
+              <div class="comment-compose-actions">
+                <span class="comment-status" id="comment-status" aria-live="polite"></span>
+                <button type="button" class="btn-primary small" id="comment-submit">Post comment</button>
+              </div>
+            </div>
+
+            <div class="comment-list" id="comment-list"></div>
+          </div>
+        </section>
+
         <div class="video-details">
           <div class="video-meta" id="current-meta"></div>
           <div class="tag-list" id="current-tags"></div>
         </div>
         <p class="player-note" id="video-note" hidden></p>
       </section>
-
-      <section class="suggestions-section">
-        <h3 class="section-heading">You might also like</h3>
-        <div class="container" id="related-grid"></div>
-      </section>
     </main>
 
     <footer>
       <p><strong>ESMERINGHOY</strong> — 18+ adults only. All performers depicted are adults.</p>
       <p class="footer-note">
-        Placeholder catalog: edit via the admin panel to publish your own licensed content.
+        All clips are published by ESMERINGHOY. Only distribute material you have the rights to.
       </p>
     </footer>
   </div>
 
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" hidden>
+    <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Close photo viewer">&times;</button>
+    <button type="button" class="lightbox-nav lightbox-prev" id="lightbox-prev" aria-label="Previous photo">&lsaquo;</button>
+    <img class="lightbox-img" id="lightbox-img" alt="">
+    <button type="button" class="lightbox-nav lightbox-next" id="lightbox-next" aria-label="Next photo">&rsaquo;</button>
+    <div class="lightbox-caption" id="lightbox-caption"></div>
+  </div>
+
   <script src="catalog.js"></script>
+  <script src="media-diagnosis.js"></script>
   <script src="data.js"></script>
   <script src="tracker.js"></script>
   <script src="store.js"></script>
@@ -113,9 +173,23 @@
       var muteBtn = document.getElementById("vp-mute");
       var fullBtn = document.getElementById("vp-full");
       var messageEl = document.getElementById("vp-message");
+      var liveViewsEl = document.getElementById("live-views");
+      var likeBtn = document.getElementById("vote-like");
+      var dislikeBtn = document.getElementById("vote-dislike");
+      var likeCountEl = document.getElementById("like-count");
+      var dislikeCountEl = document.getElementById("dislike-count");
 
       var isSeeking = false;
       var hideTimer = null;
+      var currentMediaUrl = null; /* what the <video> or hls.js is actually loading */
+
+      /* Every part of this title, and its photos. Both are optional. */
+      var clips = window.eshClips(video);
+      var gallery = window.eshGallery(video);
+      var activeClipIndex = 0;
+      var clipButtons = [];
+      var galleryUrls = [];
+      var lightboxIndex = -1;
 
       /* ------------------------------------------------------------ helpers */
 
@@ -129,11 +203,134 @@
         return (h ? h + ":" + pad(m) : String(m)) + ":" + pad(s);
       }
 
+      function esc(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+
+      /* Failure reporting, in one place. Every way playback can fail ends up
+         here — a signed link that never arrived, an HTTP error from the CDN, an
+         hls.js parse failure, a codec this browser cannot decode — and each one
+         names which of those it is and what fixes it. The <video> element by
+         itself reports none of that: it has one event and one number. */
+
       function fail(text) {
-        messageEl.textContent = text;
+        showFailure({ title: text, detail: "", hint: "", operator: "", retry: false });
+      }
+
+      function showFailure(diagnosis) {
+        messageEl.innerHTML =
+          '<div class="vp-failure">' +
+            '<span class="vp-failure-title">' + esc(diagnosis.title) + "</span>" +
+            (diagnosis.detail ? '<span class="vp-failure-detail">' + esc(diagnosis.detail) + "</span>" : "") +
+            (diagnosis.hint ? '<span class="vp-failure-hint">' + esc(diagnosis.hint) + "</span>" : "") +
+            (diagnosis.operator ? '<code class="vp-failure-op">' + esc(diagnosis.operator) + "</code>" : "") +
+            (diagnosis.retry ? '<button type="button" class="btn-ghost small" id="vp-retry">Try again</button>' : "") +
+          "</div>";
         messageEl.hidden = false;
+        messageEl.classList.add("has-failure");
         container.classList.add("no-video");
         document.getElementById("vp-controls").hidden = true;
+
+        var retry = document.getElementById("vp-retry");
+        if (retry) retry.addEventListener("click", retryPlayback);
+        if (window.console && console.info) {
+          console.info("Video not playing — " + (diagnosis.operator || diagnosis.title));
+        }
+      }
+
+      function clearFailure() {
+        messageEl.hidden = true;
+        messageEl.innerHTML = "";
+        messageEl.classList.remove("has-failure");
+        container.classList.remove("no-video");
+        document.getElementById("vp-controls").hidden = false;
+      }
+
+      /* Rebuilds the part being watched from scratch: a new signature, a fresh
+         hls.js. */
+      function retryPlayback() {
+        if (clips.length) playClip(activeClipIndex, false);
+        else render();
+      }
+
+      /* The element says playback failed but never why, so the file is asked
+         directly: the CDN answers a failed media request with JSON that names
+         the cause outright, and that is what gets shown. */
+      function explainMediaFailure(input) {
+        input = input || {};
+        var url = input.url || currentMediaUrl;
+        var diagnose = window.EshDiagnose;
+
+        if (!diagnose) {
+          fail("This video could not be loaded.");
+          return;
+        }
+        if (!url || typeof fetch !== "function") {
+          showFailure(diagnose.explain(input));
+          return;
+        }
+
+        fetch(url, {
+          method: "GET",
+          headers: { Range: "bytes=0-1" },
+          credentials: "omit",
+          cache: "no-store"
+        }).then(function (response) {
+          if (response.ok) {
+            /* The bytes arrived, so delivery works and the problem is putting
+               them on screen — a codec or a truncated file, not a link. */
+            showFailure(diagnose.explain({
+              status: response.status,
+              mediaErrorCode: input.mediaErrorCode,
+              hlsDetails: input.hlsDetails
+            }));
+            return null;
+          }
+          return response.json().catch(function () { return {}; }).then(function (body) {
+            showFailure(diagnose.explain({
+              status: response.status,
+              code: body.error,
+              message: body.message,
+              path: body.path,
+              origin: window.location.origin,
+              mediaErrorCode: input.mediaErrorCode,
+              hlsDetails: input.hlsDetails
+            }));
+          });
+        }).catch(function () {
+          /* Nothing readable came back. A bare HEAD settles whether that is
+             "no server" or "an answer the browser withheld" (a missing
+             SITE_ORIGINS entry, usually) and the two need different messages. */
+          var probe = window.eshReachable ? window.eshReachable(url) : Promise.resolve(false);
+          probe.then(function (answered) {
+            showFailure(diagnose.explain({
+              status: 0,
+              corsBlocked: answered,
+              mediaErrorCode: input.mediaErrorCode,
+              hlsDetails: input.hlsDetails
+            }));
+          });
+        });
+      }
+
+      /* No playable URL was handed over: the Worker said why in its error body,
+         which data.js kept. */
+      function explainSigningFailure() {
+        var last = window.eshLastSigningFailure ? window.eshLastSigningFailure() : null;
+        if (window.EshDiagnose) {
+          showFailure(window.EshDiagnose.explain({
+            status: last && last.status,
+            code: last && last.code,
+            message: last && last.message,
+            corsBlocked: Boolean(last && last.corsBlocked),
+            origin: window.location.origin,
+            stage: "signing"
+          }));
+          return;
+        }
+        fail("The page could not get a video link.");
       }
 
       function updateTime() {
@@ -236,7 +433,10 @@
       });
 
       player.addEventListener("error", function () {
-        fail("This video could not be loaded. Check the URL in the admin panel.");
+        /* Clearing the source fires an error too; there is nothing to report
+           until a source exists. */
+        if (!currentMediaUrl) return;
+        explainMediaFailure({ mediaErrorCode: player.error && player.error.code });
       });
 
       seek.addEventListener("input", function () {
@@ -309,6 +509,15 @@
       /* ------------------------------------------------------------- keyboard */
 
       document.addEventListener("keydown", function (e) {
+        /* While a photo is open its keys win: arrows move between photos and
+           Escape closes, instead of seeking or leaving fullscreen. */
+        if (lightboxIndex >= 0) {
+          if (e.key === "Escape") { e.preventDefault(); closeLightbox(); }
+          else if (e.key === "ArrowRight") { e.preventDefault(); stepLightbox(1); }
+          else if (e.key === "ArrowLeft") { e.preventDefault(); stepLightbox(-1); }
+          return;
+        }
+
         var tag = (e.target.tagName || "").toLowerCase();
         if (tag === "input" || tag === "select" || tag === "textarea") return;
 
@@ -334,6 +543,7 @@
       /* ------------------------------------------------------------------ HLS */
 
       function attachMedia(url) {
+        currentMediaUrl = url;
         if (!window.eshIsHls(url)) {
           player.src = url;
           return;
@@ -353,6 +563,19 @@
             hls.loadSource(url);
             hls.attachMedia(player);
             window.__eshHls = hls;
+
+            /* hls.js knows which request failed and with what status, which is
+               more than the element ever says. Non-fatal errors are its own
+               business: it retries and switches levels on its own. */
+            hls.on(window.Hls.Events.ERROR, function (event, data) {
+              if (!data || !data.fatal) return;
+              explainMediaFailure({
+                status: (data.response && data.response.code) || 0,
+                url: (data.frag && data.frag.url) || data.url || currentMediaUrl,
+                hlsDetails: data.details,
+                mediaErrorCode: player.error && player.error.code
+              });
+            });
           } else {
             fail("This browser cannot play HLS.");
           }
@@ -360,6 +583,791 @@
         script.onerror = function () { fail("Could not load the HLS player library."); };
         document.head.appendChild(script);
       }
+
+      /* --------------------------------------------------------- clip buttons */
+
+      function markActiveClip() {
+        clipButtons.forEach(function (btn, i) {
+          var active = i === activeClipIndex;
+          btn.classList.toggle("active", active);
+          btn.setAttribute("aria-selected", active ? "true" : "false");
+          btn.tabIndex = active ? 0 : -1;
+        });
+      }
+
+      /* The parts of a title, as buttons under the player. A title with a single
+         file has nothing to switch between, so the strip stays hidden. */
+      function renderClips() {
+        var section = document.getElementById("clip-section");
+        var strip = document.getElementById("clip-strip");
+
+        if (clips.length < 2) {
+          section.hidden = true;
+          return;
+        }
+
+        section.hidden = false;
+        document.getElementById("clip-count").textContent = clips.length;
+        strip.innerHTML = "";
+        clipButtons = [];
+
+        clips.forEach(function (clip, i) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "clip-btn";
+          btn.setAttribute("role", "tab");
+          btn.setAttribute("aria-label", "Play clip " + clip.label);
+          btn.setAttribute("aria-selected", "false");
+          btn.textContent = clip.label;
+          btn.addEventListener("click", function () {
+            if (i === activeClipIndex && currentMediaUrl && !player.paused) {
+              togglePlay();
+              return;
+            }
+            playClip(i, true);
+            showControls();
+          });
+          strip.appendChild(btn);
+          clipButtons.push(btn);
+        });
+
+        markActiveClip();
+      }
+
+      /* Loads one part. `autoplay` is true for a click on a clip button; the
+         first part loads paused so its poster is what the visitor sees. */
+      function playClip(index, autoplay) {
+        var clip = clips[index];
+        if (!clip) return;
+
+        activeClipIndex = index;
+        markActiveClip();
+        clearFailure();
+
+        if (window.__eshHls) {
+          try { window.__eshHls.destroy(); } catch (e) {}
+          window.__eshHls = null;
+        }
+        if (window.__eshTracking && window.__eshTracking.stop) window.__eshTracking.stop();
+        window.__eshTracking = null;
+
+        currentMediaUrl = null;
+        player.removeAttribute("src");
+        try { player.load(); } catch (e) {}
+        seek.value = "0";
+        seek.disabled = true;
+        timeEl.textContent = "0:00 / 0:00";
+
+        var key = window.eshMediaKeyFor(clip.video);
+        var plain = window.eshMediaUrlFor(clip.video);
+
+        window.eshSignedUrls([key].filter(Boolean)).then(function (signed) {
+          /* With signing on, an unsigned path is not playable, so attaching it
+             produces a stall that explains nothing. The reason the exchange
+             failed — a refused origin, a Worker with no signing key — is the
+             part worth showing. */
+          if (window.eshSigningEnabled() && key && !signed[key]) {
+            explainSigningFailure();
+            return;
+          }
+
+          var src = (key && signed[key]) || plain;
+          if (!src) {
+            fail("This clip has no file.");
+            return;
+          }
+
+          attachMedia(src);
+          updateTime();
+
+          /* Counting starts only now: playback cannot begin before the signed
+             source exists, and the report is signed with that same URL. */
+          window.__eshTracking = window.EsmeringhoyTracker.attach(
+            player,
+            function () { return key; },
+            window.eshTokenFor
+          );
+
+          if (autoplay) {
+            var started = player.play();
+            if (started && started.catch) {
+              started.catch(function (err) {
+                /* Browsers block audible autoplay before a gesture. Muted
+                   playback is always allowed, so start there and let the
+                   viewer unmute rather than leaving the poster up. */
+                if (err && err.name === "NotAllowedError") {
+                  player.muted = true;
+                  var muted = player.play();
+                  if (muted && muted.catch) {
+                    muted.catch(function (e) { console.warn("Autoplay blocked:", e); });
+                  }
+                } else {
+                  console.warn("Playback blocked:", err);
+                }
+              });
+            }
+          }
+        });
+      }
+
+      /* --------------------------------------------------------------- gallery */
+
+      function renderGallery() {
+        var section = document.getElementById("gallery-section");
+        var grid = document.getElementById("gallery-grid");
+
+        if (!gallery.length) {
+          section.hidden = true;
+          return;
+        }
+
+        section.hidden = false;
+        document.getElementById("gallery-count").textContent = gallery.length;
+        grid.innerHTML = "";
+        galleryUrls = gallery.map(function (value) { return window.eshMediaUrlFor(value); });
+
+        gallery.forEach(function (value, i) {
+          var pending = Boolean(window.eshMediaKeyFor(value) && window.eshSigningEnabled());
+
+          var img = document.createElement("img");
+          img.className = "gallery-img";
+          img.alt = video.title + " — photo " + (i + 1);
+          img.loading = "lazy";
+          img.decoding = "async";
+          img.src = pending ? window.eshPlaceholderPixel : galleryUrls[i];
+          if (pending) img.setAttribute("data-photo-key", window.eshMediaKeyFor(value));
+
+          var item = document.createElement("button");
+          item.type = "button";
+          item.className = "gallery-item" + (i >= GALLERY_PREVIEW ? " gallery-extra" : "");
+          if (i >= GALLERY_PREVIEW) item.hidden = true;
+          item.setAttribute("aria-label", "Open photo " + (i + 1) + " of " + gallery.length);
+          item.appendChild(img);
+          item.addEventListener("click", function () { openLightbox(i); });
+          grid.appendChild(item);
+        });
+
+        var keys = gallery.map(function (value) { return window.eshMediaKeyFor(value); }).filter(Boolean);
+        if (keys.length) {
+          window.eshSignedUrls(keys).then(function (signed) {
+            [].forEach.call(grid.querySelectorAll("img[data-photo-key]"), function (img) {
+              var photoKey = img.getAttribute("data-photo-key");
+              if (signed[photoKey]) img.src = signed[photoKey];
+            });
+            gallery.forEach(function (value, i) {
+              var photoKey = window.eshMediaKeyFor(value);
+              if (photoKey && signed[photoKey]) galleryUrls[i] = signed[photoKey];
+            });
+          });
+        }
+
+        /* Show a taste of the set, not all of it. The rest waits behind the
+           button, and the toggle disappears when there is nothing more to show. */
+        var toggle = document.getElementById("gallery-toggle");
+        toggle.hidden = gallery.length <= GALLERY_PREVIEW;
+        setGalleryExpanded(false);
+      }
+
+      /* Full screen photo viewer. The overlay's backdrop is blurred, so the page
+         behind it goes soft instead of disappearing. */
+      function showLightboxPhoto() {
+        if (lightboxIndex < 0 || !galleryUrls[lightboxIndex]) return;
+
+        var img = document.getElementById("lightbox-img");
+        img.src = galleryUrls[lightboxIndex];
+        img.alt = video.title + " — photo " + (lightboxIndex + 1);
+
+        document.getElementById("lightbox-caption").textContent =
+          (lightboxIndex + 1) + " / " + galleryUrls.length;
+
+        var many = galleryUrls.length > 1;
+        document.getElementById("lightbox-prev").hidden = !many;
+        document.getElementById("lightbox-next").hidden = !many;
+      }
+
+      function openLightbox(index) {
+        if (!galleryUrls.length) return;
+        lightboxIndex = Math.max(0, Math.min(index, galleryUrls.length - 1));
+        document.getElementById("lightbox").hidden = false;
+        document.body.classList.add("has-lightbox");
+        showLightboxPhoto();
+        document.getElementById("lightbox-close").focus();
+      }
+
+      function closeLightbox() {
+        lightboxIndex = -1;
+        document.getElementById("lightbox").hidden = true;
+        document.body.classList.remove("has-lightbox");
+        document.getElementById("lightbox-img").removeAttribute("src");
+      }
+
+      function stepLightbox(delta) {
+        if (lightboxIndex < 0) return;
+        var count = galleryUrls.length;
+        lightboxIndex = (lightboxIndex + delta + count) % count;
+        showLightboxPhoto();
+      }
+
+      (function () {
+        var box = document.getElementById("lightbox");
+        document.getElementById("lightbox-close").addEventListener("click", closeLightbox);
+        document.getElementById("lightbox-prev").addEventListener("click", function (e) {
+          e.stopPropagation();
+          stepLightbox(-1);
+        });
+        document.getElementById("lightbox-next").addEventListener("click", function (e) {
+          e.stopPropagation();
+          stepLightbox(1);
+        });
+        /* Clicking the blurred backdrop closes; clicking the photo does not. */
+        box.addEventListener("click", function (e) {
+          if (e.target === box) closeLightbox();
+        });
+      })();
+
+      /* ------------------------------------------------------- gallery toggle */
+
+      var GALLERY_PREVIEW = 12;
+
+      function setGalleryExpanded(expanded) {
+        var grid = document.getElementById("gallery-grid");
+        var toggle = document.getElementById("gallery-toggle");
+        if (!grid || !toggle) return;
+
+        grid.hidden = false;
+        [].forEach.call(grid.querySelectorAll(".gallery-extra"), function (item) {
+          item.hidden = !expanded;
+        });
+        toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+        toggle.textContent = expanded ? "Show fewer" : "Show all " + gallery.length + " photos";
+      }
+
+      (function () {
+        var toggle = document.getElementById("gallery-toggle");
+        if (!toggle) return;
+        toggle.addEventListener("click", function () {
+          setGalleryExpanded(toggle.getAttribute("aria-expanded") !== "true");
+        });
+      })();
+
+      /* ------------------------------------------------------- more like this */
+
+      function shuffle(list) {
+        for (var i = list.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var tmp = list[i];
+          list[i] = list[j];
+          list[j] = tmp;
+        }
+        return list;
+      }
+
+      /* Random other titles, not a tag score: every visit can surface a
+         different set from the catalog. */
+      function renderMoreLikeThis() {
+        var section = document.getElementById("more-section");
+        var grid = document.getElementById("more-grid");
+        grid.innerHTML = "";
+
+        var picks = shuffle(videos.filter(function (v) {
+          return v.id !== video.id;
+        }).slice()).slice(0, 8);
+
+        if (!picks.length) {
+          section.hidden = true;
+          return;
+        }
+
+        section.hidden = false;
+
+        picks.forEach(function (v) {
+          var card = document.createElement("article");
+          card.className = "video-card clickable";
+          card.tabIndex = 0;
+          card.setAttribute("role", "link");
+          card.setAttribute("aria-label", v.title);
+
+          var poster = window.eshPosterStart(v);
+          card.innerHTML =
+            '<div class="thumb">' +
+              '<img class="poster" src="' + poster.src + '" alt="' + esc(v.title) + '" loading="lazy"' +
+                (poster.pending ? ' data-poster-key="' + esc(poster.key) + '"' : "") + '>' +
+              '<span class="badge duration">' + esc(v.duration) + '</span>' +
+              '<div class="thumb-overlay"><span class="play-icon">▶</span></div>' +
+            '</div>' +
+            '<div class="video-info">' +
+              '<h3 class="video-title">' + esc(v.title) + '</h3>' +
+              '<div class="video-meta"><span>' + window.eshViews(v.views) + ' views</span>' +
+              '<span>' + v.rating + '%</span></div>' +
+            '</div>';
+
+          function go() { window.location.href = "player.html?id=" + encodeURIComponent(v.id); }
+          card.addEventListener("click", go);
+          card.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+          });
+          grid.appendChild(card);
+        });
+
+        var posterKeys = picks.map(function (v) {
+          return v.poster ? window.eshMediaKeyFor(v.poster) : null;
+        }).filter(Boolean);
+
+        window.eshSignedUrls(posterKeys).then(function (signed) {
+          [].forEach.call(grid.querySelectorAll("img[data-poster-key]"), function (img) {
+            var key = img.getAttribute("data-poster-key");
+            if (signed[key]) img.src = signed[key];
+          });
+        });
+      }
+
+      /* ------------------------------------------------------------ comments */
+
+      var COMMENT_OWNER_KEY = "esh_comment_owner";
+      var COMMENT_NAME_KEY = "esh_comment_name";
+      var commentList = [];
+      var commentsLoaded = false;
+      var commentsLoading = false;
+      var commentEditId = null;
+      var commentPosting = false;
+      var memoryOwner = null;
+
+      function commentEndpoint() {
+        var settings = window.eshMediaSettings ? window.eshMediaSettings() : {};
+        if (settings.commentEndpoint) return settings.commentEndpoint;
+        var sign = settings.signEndpoint || "";
+        if (/\/token\b/.test(sign)) return sign.replace(/\/token\b[^/]*$/, "/comments");
+        return "/comments";
+      }
+
+      function randomToken() {
+        try {
+          var bytes = new Uint8Array(24);
+          window.crypto.getRandomValues(bytes);
+          var out = "";
+          for (var i = 0; i < bytes.length; i++) {
+            out += (bytes[i] < 16 ? "0" : "") + bytes[i].toString(16);
+          }
+          return out;
+        } catch (e) {
+          return "c" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
+      }
+
+      function commentOwner() {
+        try {
+          var stored = localStorage.getItem(COMMENT_OWNER_KEY);
+          if (!stored) {
+            stored = randomToken();
+            localStorage.setItem(COMMENT_OWNER_KEY, stored);
+          }
+          return stored;
+        } catch (e) {
+          if (!memoryOwner) memoryOwner = randomToken();
+          return memoryOwner;
+        }
+      }
+
+      function generatedName() {
+        return "Anonymous" + (10000 + Math.floor(Math.random() * 90000));
+      }
+
+      function storedCommentName() {
+        try { return localStorage.getItem(COMMENT_NAME_KEY) || ""; } catch (e) { return ""; }
+      }
+
+      function rememberCommentName(name) {
+        try { localStorage.setItem(COMMENT_NAME_KEY, name); } catch (e) {}
+      }
+
+      function commentTime(seconds) {
+        var then = Number(seconds) * 1000;
+        var diff = Math.max(0, Date.now() - then);
+        if (diff < 60000) return "just now";
+        if (diff < 3600000) return Math.floor(diff / 60000) + " min ago";
+        if (diff < 86400000) return Math.floor(diff / 3600000) + " h ago";
+        if (diff < 604800000) return Math.floor(diff / 86400000) + " days ago";
+        return new Date(then).toLocaleDateString();
+      }
+
+      function setCommentStatus(text, kind) {
+        var el = document.getElementById("comment-status");
+        if (!el) return;
+        el.textContent = text || "";
+        el.className = "comment-status" + (kind ? " " + kind : "");
+      }
+
+      function commentNameValue() {
+        var input = document.getElementById("comment-name");
+        var name = input.value.trim().replace(/\s+/g, " ").slice(0, 32);
+        if (!name) {
+          name = generatedName();
+          input.value = name;
+        }
+        rememberCommentName(name);
+        return name;
+      }
+
+      function commentApi(method, body) {
+        var options = { method: method, credentials: "omit", headers: {} };
+        if (body) {
+          options.headers["Content-Type"] = "application/json";
+          options.body = JSON.stringify(body);
+        }
+        return fetch(commentEndpoint(), options).then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (data) {
+            if (!response.ok) {
+              var error = new Error(data.message || ("Comments answered HTTP " + response.status));
+              error.status = response.status;
+              error.code = data.error || null;
+              throw error;
+            }
+            return data;
+          });
+        });
+      }
+
+      function renderCommentList() {
+        var list = document.getElementById("comment-list");
+        var count = document.getElementById("comment-count");
+        if (!list) return;
+        list.innerHTML = "";
+
+        if (count) {
+          count.textContent = commentList.length;
+          count.hidden = !commentList.length;
+        }
+
+        if (!commentList.length) {
+          list.innerHTML = '<p class="comment-empty">No comments yet. Be the first.</p>';
+          return;
+        }
+
+        commentList.forEach(function (comment) {
+          var item = document.createElement("article");
+          item.className = "comment";
+
+          var head =
+            '<div class="comment-head">' +
+              '<span class="comment-name">' + esc(comment.name) + '</span>' +
+              '<span class="comment-time">' + esc(commentTime(comment.createdAt)) + '</span>' +
+              (comment.owned ? '<span class="comment-you">you</span>' : "") +
+            '</div>';
+
+          if (comment.owned && commentEditId === comment.id) {
+            item.innerHTML = head +
+              '<textarea class="comment-edit" rows="3" maxlength="1000">' + esc(comment.body) + '</textarea>' +
+              '<div class="comment-actions">' +
+                '<button type="button" class="btn-ghost small" data-cancel="' + esc(comment.id) + '">Cancel</button>' +
+                '<button type="button" class="btn-primary small" data-save="' + esc(comment.id) + '">Save</button>' +
+              '</div>';
+
+            item.querySelector("[data-cancel]").addEventListener("click", function () {
+              commentEditId = null;
+              renderCommentList();
+            });
+            item.querySelector("[data-save]").addEventListener("click", function () {
+              saveEditComment(comment.id, item.querySelector(".comment-edit").value);
+            });
+          } else {
+            item.innerHTML = head +
+              '<p class="comment-body">' + esc(comment.body) + '</p>' +
+              (comment.owned
+                ? '<div class="comment-actions">' +
+                    '<button type="button" class="comment-action" data-edit="' + esc(comment.id) + '">Edit</button>' +
+                    '<button type="button" class="comment-action danger" data-delete="' + esc(comment.id) + '">Delete</button>' +
+                  '</div>'
+                : "");
+
+            var edit = item.querySelector("[data-edit]");
+            if (edit) {
+              edit.addEventListener("click", function () {
+                commentEditId = comment.id;
+                renderCommentList();
+                var box = document.querySelector(".comment-edit");
+                if (box) box.focus();
+              });
+            }
+
+            var del = item.querySelector("[data-delete]");
+            if (del) del.addEventListener("click", function () { deleteComment(comment.id); });
+          }
+
+          list.appendChild(item);
+        });
+      }
+
+      function loadComments() {
+        if (commentsLoaded || commentsLoading) return;
+        commentsLoading = true;
+        setCommentStatus("Loading…", "");
+
+        var base = commentEndpoint();
+        var url = base + (base.indexOf("?") === -1 ? "?" : "&") +
+          "key=" + encodeURIComponent(video.id) +
+          "&owner=" + encodeURIComponent(commentOwner());
+
+        fetch(url, { credentials: "omit" })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+              if (!response.ok) throw new Error(data.message || ("Comments answered HTTP " + response.status));
+              return data;
+            });
+          })
+          .then(function (data) {
+            commentList = Array.isArray(data.comments) ? data.comments : [];
+            commentsLoaded = true;
+            commentsLoading = false;
+            setCommentStatus("", "");
+            renderCommentList();
+          })
+          .catch(function (err) {
+            commentsLoading = false;
+            commentList = [];
+            renderCommentList();
+            setCommentStatus("Comments need the deployed site to load. " +
+              (err && err.message ? err.message : ""), "warn");
+          });
+      }
+
+      function postComment() {
+        if (commentPosting) return;
+
+        var bodyEl = document.getElementById("comment-body");
+        var text = bodyEl.value.trim().slice(0, 1000);
+        if (!text) {
+          setCommentStatus("Write a comment first.", "warn");
+          bodyEl.focus();
+          return;
+        }
+
+        var button = document.getElementById("comment-submit");
+        commentPosting = true;
+        button.disabled = true;
+        setCommentStatus("Posting…", "");
+
+        commentApi("POST", {
+          key: video.id,
+          name: commentNameValue(),
+          body: text,
+          owner: commentOwner()
+        }).then(function (data) {
+          if (data && data.comment) commentList.unshift(data.comment);
+          commentsLoaded = true;
+          bodyEl.value = "";
+          commentPosting = false;
+          button.disabled = false;
+          setCommentStatus("Posted.", "ok");
+          renderCommentList();
+        }).catch(function (err) {
+          commentPosting = false;
+          button.disabled = false;
+          setCommentStatus(err && err.message ? err.message : "Could not post the comment.", "error");
+        });
+      }
+
+      function saveEditComment(id, value) {
+        var text = String(value || "").trim().slice(0, 1000);
+        if (!text) {
+          setCommentStatus("Write something first.", "warn");
+          return;
+        }
+
+        commentApi("PATCH", {
+          id: id,
+          name: commentNameValue(),
+          body: text,
+          owner: commentOwner()
+        }).then(function (data) {
+          var updated = data && data.comment;
+          commentList = commentList.map(function (comment) {
+            if (comment.id !== id) return comment;
+            return updated || {
+              id: comment.id,
+              name: commentNameValue(),
+              body: text,
+              createdAt: comment.createdAt,
+              updatedAt: comment.updatedAt,
+              owned: true
+            };
+          });
+          commentEditId = null;
+          setCommentStatus("Updated.", "ok");
+          renderCommentList();
+        }).catch(function (err) {
+          setCommentStatus(err && err.message ? err.message : "Could not update the comment.", "error");
+        });
+      }
+
+      function deleteComment(id) {
+        if (!window.confirm("Delete this comment? This cannot be undone.")) return;
+
+        commentApi("DELETE", { id: id, owner: commentOwner() }).then(function () {
+          commentList = commentList.filter(function (comment) { return comment.id !== id; });
+          commentEditId = null;
+          setCommentStatus("Deleted.", "ok");
+          renderCommentList();
+        }).catch(function (err) {
+          setCommentStatus(err && err.message ? err.message : "Could not delete the comment.", "error");
+        });
+      }
+
+      (function setupComments() {
+        var toggle = document.getElementById("comments-toggle");
+        var panel = document.getElementById("comments-panel");
+        var nameInput = document.getElementById("comment-name");
+        var bodyInput = document.getElementById("comment-body");
+        if (!toggle || !panel || !nameInput || !bodyInput) return;
+
+        var name = storedCommentName() || generatedName();
+        rememberCommentName(name);
+        nameInput.value = name;
+
+        nameInput.addEventListener("input", function () {
+          rememberCommentName(nameInput.value.trim().slice(0, 32));
+        });
+
+        document.getElementById("comment-name-new").addEventListener("click", function () {
+          var generated = generatedName();
+          nameInput.value = generated;
+          rememberCommentName(generated);
+        });
+
+        toggle.addEventListener("click", function () {
+          var opening = panel.hidden;
+          panel.hidden = !opening;
+          toggle.setAttribute("aria-expanded", opening ? "true" : "false");
+          toggle.textContent = opening ? "Hide comments" : "Add a comment";
+          if (opening) {
+            loadComments();
+            bodyInput.focus();
+          }
+        });
+
+        document.getElementById("comment-submit").addEventListener("click", postComment);
+        bodyInput.addEventListener("keydown", function (e) {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            postComment();
+          }
+        });
+      })();
+
+      /* ------------------------------------------------------- live views + votes */
+
+      function routeEndpoint(name) {
+        var settings = window.eshMediaSettings ? window.eshMediaSettings() : {};
+        var explicit = settings[name + "Endpoint"];
+        if (explicit) return explicit;
+        var sign = settings.signEndpoint || "";
+        if (/\/token\b/.test(sign)) return sign.replace(/\/token\b[^/]*$/, "/" + name);
+        return "/" + name;
+      }
+
+      var liveViewCount = Number(video.views) || 0;
+      var viewCounted = false;
+      var voteTokenCache = null;
+      var voteState = { likes: 0, dislikes: 0, mine: 0 };
+
+      function setLiveViews(count) {
+        liveViewCount = Math.max(0, Number(count) || 0);
+        liveViewsEl.textContent = window.eshViews(liveViewCount) +
+          (liveViewCount === 1 ? " view" : " views");
+      }
+
+      function loadViewCount() {
+        fetch(routeEndpoint("views") + "?key=" + encodeURIComponent(video.id), { credentials: "omit" })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (data && typeof data.views === "number") setLiveViews(data.views);
+          })
+          .catch(function () {});
+      }
+
+      function countViewOnce() {
+        if (viewCounted) return;
+        viewCounted = true;
+        fetch(routeEndpoint("views"), {
+          method: "POST",
+          credentials: "omit",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: video.id })
+        }).then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (data && typeof data.views === "number") setLiveViews(data.views);
+          })
+          .catch(function () {});
+      }
+
+      function voteToken() {
+        if (voteTokenCache) return voteTokenCache;
+        try {
+          var stored = localStorage.getItem("esh_vote_voter");
+          if (!stored) {
+            stored = randomToken();
+            localStorage.setItem("esh_vote_voter", stored);
+          }
+          voteTokenCache = stored;
+        } catch (e) {
+          voteTokenCache = randomToken();
+        }
+        return voteTokenCache;
+      }
+
+      function renderVotes() {
+        likeCountEl.textContent = voteState.likes;
+        dislikeCountEl.textContent = voteState.dislikes;
+        likeBtn.classList.toggle("active", voteState.mine === 1);
+        dislikeBtn.classList.toggle("active", voteState.mine === -1);
+        likeBtn.setAttribute("aria-pressed", voteState.mine === 1 ? "true" : "false");
+        dislikeBtn.setAttribute("aria-pressed", voteState.mine === -1 ? "true" : "false");
+      }
+
+      function loadVotes() {
+        fetch(routeEndpoint("votes") + "?key=" + encodeURIComponent(video.id) +
+          "&voter=" + encodeURIComponent(voteToken()), { credentials: "omit" })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (!data) return;
+            voteState = {
+              likes: Number(data.likes) || 0,
+              dislikes: Number(data.dislikes) || 0,
+              mine: Number(data.mine) || 0
+            };
+            renderVotes();
+          })
+          .catch(function () {});
+      }
+
+      function castVote(value) {
+        var next = voteState.mine === value ? 0 : value;
+        fetch(routeEndpoint("votes"), {
+          method: "POST",
+          credentials: "omit",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: video.id, voter: voteToken(), value: next })
+        }).then(function (response) {
+          if (!response.ok) throw new Error("Vote failed");
+          return response.json();
+        }).then(function (data) {
+          if (!data) return;
+          voteState = {
+            likes: Number(data.likes) || 0,
+            dislikes: Number(data.dislikes) || 0,
+            mine: Number(data.mine) || 0
+          };
+          renderVotes();
+        }).catch(function () {});
+      }
+
+      likeBtn.addEventListener("click", function () { castVote(1); });
+      dislikeBtn.addEventListener("click", function () { castVote(-1); });
+      player.addEventListener("play", countViewOnce);
+      setInterval(function () {
+        if (document.hidden) return;
+        loadViewCount();
+        loadVotes();
+      }, 15000);
 
       /* ---------------------------------------------------------------- render */
 
@@ -373,11 +1381,23 @@
         var qualityEl = document.getElementById("current-quality");
         if (quality) { qualityEl.textContent = quality; qualityEl.hidden = false; }
 
+        var description = document.getElementById("current-description");
+        if (video.description) {
+          description.hidden = false;
+          description.textContent = video.description;
+        } else {
+          description.hidden = true;
+          description.textContent = "";
+        }
+
         document.getElementById("current-meta").innerHTML =
-          "<span>" + window.eshViews(video.views) + " views</span>" +
           "<span>" + video.rating + "% liked</span>" +
           "<span>" + video.duration + "</span>" +
           "<span>Added " + window.eshAgo(video.added) + "</span>";
+
+        setLiveViews(video.views);
+        loadViewCount();
+        loadVotes();
 
         var tagList = document.getElementById("current-tags");
         tagList.innerHTML = "";
@@ -389,103 +1409,33 @@
           tagList.appendChild(chip);
         });
 
-        var url = window.eshMediaUrl(video);
-        if (!url) {
+        renderClips();
+        renderGallery();
+
+        if (!clips.length) {
           fail("No video yet for this clip");
           var note = document.getElementById("video-note");
           note.hidden = false;
-          note.textContent = "Add the file URL in the admin panel (catalog → Video URL), " +
+          note.textContent = "Add the file URL in the admin panel (catalog → Video links), " +
             "then publish catalog.js.";
-          renderRelated();
+          renderMoreLikeThis();
           return;
         }
 
-        /* The clip and its thumbnail can both sit behind the signed CDN, so ask
-           for both signatures in one round trip before loading anything. */
+        /* The thumbnail can sit behind the signed CDN too, so get its signature
+           before showing it. The clip itself is signed when it loads. */
         var poster = window.eshPosterStart(video);
-        var videoKey = window.eshMediaKey(video);
-
         if (!poster.pending) player.poster = poster.src;
-        updateTime();
-
-        window.eshSignedUrls([videoKey, poster.key].filter(Boolean)).then(function (signed) {
-          if (poster.key && signed[poster.key]) player.poster = signed[poster.key];
-          attachMedia((videoKey && signed[videoKey]) || url);
-          updateTime();
-
-          /* Counting starts only now: playback cannot begin before the signed
-             source exists, and the report is signed with that same URL. */
-          window.__eshTracking = window.EsmeringhoyTracker.attach(
-            player,
-            function () { return videoKey; },
-            window.eshTokenFor
-          );
-        });
-
-        renderRelated();
-      }
-
-      function renderRelated() {
-        var grid = document.getElementById("related-grid");
-        grid.innerHTML = "";
-
-        var tags = video.tags || [];
-        var scored = videos
-          .filter(function (v) { return v.id !== video.id; })
-          .map(function (v) {
-            var overlap = (v.tags || []).filter(function (t) {
-              return tags.indexOf(t) !== -1;
-            }).length;
-            return { video: v, score: overlap * 1000 + v.rating };
-          })
-          .sort(function (a, b) { return b.score - a.score; })
-          .slice(0, 8);
-
-        scored.forEach(function (entry) {
-          var v = entry.video;
-          var card = document.createElement("article");
-          card.className = "video-card clickable";
-          card.tabIndex = 0;
-          card.setAttribute("role", "link");
-          var poster = window.eshPosterStart(v);
-          card.innerHTML =
-            '<div class="thumb">' +
-              '<img class="poster" src="' + poster.src + '" alt="' + v.title + '" loading="lazy"' +
-                (poster.pending ? ' data-poster-key="' + poster.key + '"' : "") + '>' +
-              '<span class="badge duration">' + v.duration + '</span>' +
-              '<div class="thumb-overlay"><span class="play-icon">▶</span></div>' +
-            '</div>' +
-            '<div class="video-info">' +
-              '<h3 class="video-title">' + v.title + '</h3>' +
-              '<div class="video-meta"><span>' + window.eshViews(v.views) + ' views</span>' +
-              '<span>' + v.rating + '%</span></div>' +
-            '</div>';
-          function go() { window.location.href = "player.html?id=" + encodeURIComponent(v.id); }
-          card.addEventListener("click", go);
-          card.addEventListener("keydown", function (e) {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+        if (poster.key) {
+          window.eshSignedUrls([poster.key]).then(function (signed) {
+            if (signed[poster.key]) player.poster = signed[poster.key];
           });
-          grid.appendChild(card);
-        });
-
-        var posterKeys = scored.map(function (entry) {
-          return entry.video.poster ? window.eshMediaKeyFor(entry.video.poster) : null;
-        }).filter(Boolean);
-
-        window.eshSignedUrls(posterKeys).then(function (signed) {
-          grid.querySelectorAll("img[data-poster-key]").forEach(function (img) {
-            var key = img.getAttribute("data-poster-key");
-            if (signed[key]) img.src = signed[key];
-          });
-        });
-      }
-
-      var searchInput = document.getElementById("search-input");
-      searchInput.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") {
-          window.location.href = "index.html?q=" + encodeURIComponent(searchInput.value);
         }
-      });
+
+        updateTime();
+        playClip(0, true);
+        renderMoreLikeThis();
+      }
 
       window.EsmeringhoyAgeGate.onUnlock(render);
     })();

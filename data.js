@@ -27,11 +27,16 @@ window.eshMediaSettings = function () {
 };
 
 /* Turns any stored media value into a browser-loadable URL.
-   A value that is not already a URL resolves against the playback base. */
+   A value that is not already a URL resolves against the playback base.
+
+   A leading slash means "a file this site serves itself" — a thumbnail that
+   ships with the pages rather than sitting in the bucket. Those never touch the
+   playback base, so they keep working before any storage is configured. */
 window.eshMediaUrlFor = function (value) {
   if (!value) return null;
   var path = String(value);
   if (/^https?:\/\//i.test(path)) return path;
+  if (path.charAt(0) === "/") return path;
 
   var base = window.eshMediaSettings().b2BaseUrl || "";
   if (!base) return path;
@@ -39,10 +44,15 @@ window.eshMediaUrlFor = function (value) {
 };
 
 /* The bucket-relative key for a stored media value, or null when the value
-   points somewhere we do not control (so nothing should be signed for it). */
+   points somewhere we do not control (so nothing should be signed for it).
+
+   Root-relative values are site files, not bucket keys — signing one would ask
+   storage for an object that was never uploaded there and turn a perfectly good
+   thumbnail into a 404. */
 window.eshMediaKeyFor = function (value) {
   if (!value) return null;
   var path = String(value);
+  if (path.charAt(0) === "/") return null;
   if (!/^https?:\/\//i.test(path)) return path.replace(/^\/+/, "");
 
   var base = (window.eshMediaSettings().b2BaseUrl || "").replace(/\/+$/, "");
@@ -80,6 +90,35 @@ window.eshIsHls = function (url) {
   return /\.m3u8($|\?)/i.test(url || "");
 };
 
+/* ------------------------------------------------------- clips + gallery -- */
+
+/* Every playable part of a title, in order, as { label, video }.
+
+   A title with more than one file lists them in `clips` and the player turns
+   them into buttons under the video. `video` is still the primary clip, so
+   cards, links and any older page keep working; when `clips` is missing this
+   falls back to that one file. */
+window.eshClips = function (video) {
+  if (!video) return [];
+
+  var out = [];
+  (video.clips || []).forEach(function (clip) {
+    var value = typeof clip === "string" ? clip : (clip && clip.video);
+    if (!value) return;
+    var label = (clip && clip.label) || ("Clip " + (out.length + 1));
+    out.push({ label: String(label), video: value });
+  });
+
+  if (!out.length && video.video) out.push({ label: "Clip 1", video: video.video });
+  return out;
+};
+
+/* Photos attached to a title, in the order they should be shown. */
+window.eshGallery = function (video) {
+  if (!video || !Array.isArray(video.gallery)) return [];
+  return video.gallery.filter(function (value) { return Boolean(value); });
+};
+
 /* ---------------------------------------------------------------- signing -- */
 
 function signEndpoint() {
@@ -99,6 +138,29 @@ window.eshSigningEnabled = function () {
    rather than replace it (the homepage signs thumbnails after a player has
    already signed its clip), and entries are dropped once they expire. */
 var issuedTokens = {};
+
+/* Why the last signing attempt failed, or null. The player cannot tell the
+   difference between a refused origin, a Worker with no signing key and a
+   network drop from the fetch result alone, so the reason is kept here for it
+   to show — see media-diagnosis.js. */
+var lastSigningFailure = null;
+
+window.eshLastSigningFailure = function () {
+  return lastSigningFailure;
+};
+
+/* Could this URL be reached at all? A bare HEAD: no credentials, no custom
+   headers, so the browser sends it cross-origin without a preflight and it
+   settles for any answer — including one this page is not allowed to read.
+   That is the only way to tell "the server is not there" from "the server
+   answered and the browser withheld it", which are different problems with
+   different fixes. Nothing is downloaded. */
+window.eshReachable = function (url) {
+  if (!url || typeof fetch !== "function") return Promise.resolve(false);
+  return fetch(url, { method: "HEAD", mode: "no-cors", credentials: "omit", cache: "no-store" })
+    .then(function () { return true; })
+    .catch(function () { return false; });
+};
 
 window.eshTokenFor = function (key) {
   var token = issuedTokens[key];
@@ -122,9 +184,21 @@ window.eshSignedUrls = function (keys) {
   var query = wanted.map(function (key) { return "p=" + encodeURIComponent(key); }).join("&");
   var url = endpoint + (endpoint.indexOf("?") === -1 ? "?" : "&") + query;
 
+  lastSigningFailure = null;
+
   return fetch(url, { credentials: "omit" })
     .then(function (response) {
-      if (!response.ok) throw new Error("token endpoint answered HTTP " + response.status);
+      if (!response.ok) {
+        /* The Worker's error body names the cause (origin_not_allowed,
+           no_signing_key, …) — carry it, rather than only the status, so the
+           player has something true to say. */
+        return response.json().catch(function () { return {}; }).then(function (body) {
+          var problem = new Error(body.message || ("token endpoint answered HTTP " + response.status));
+          problem.status = response.status;
+          problem.code = body.error || null;
+          throw problem;
+        });
+      }
       return response.json();
     })
     .then(function (data) {
@@ -145,9 +219,33 @@ window.eshSignedUrls = function (keys) {
     .catch(function (err) {
       /* Usually a missing SITE_ORIGINS entry or a wrong sign endpoint. Falling
          back to the plain URL keeps a public setup working; a private one will
-         answer 403, which is the honest outcome. */
+         answer 403, which is the honest outcome — and the reason travels with
+         it so the player can say which of those it is. */
+      var failure = {
+        status: (err && err.status) || 0,
+        code: (err && err.code) || null,
+        message: (err && err.message) || String(err)
+      };
       console.warn("Could not fetch signed media URLs:", err);
-      return {};
+
+      if (failure.status) {
+        lastSigningFailure = failure;
+        return {};
+      }
+
+      /* No status means fetch() rejected before any answer was readable, which
+         covers both "nothing is listening" and "the answer was withheld". The
+         probe settles it, and it has to settle *before* this resolves so the
+         player explains the right one. */
+      return window.eshReachable(endpoint).then(function (answered) {
+        if (answered) {
+          failure.corsBlocked = true;
+          console.warn("The sign endpoint answered, but this page was not allowed to read " +
+            "it — if the endpoint is a Worker, add " + window.location.origin + " to SITE_ORIGINS.");
+        }
+        lastSigningFailure = failure;
+        return {};
+      });
     });
 };
 

@@ -2,8 +2,9 @@
    ESMERINGHOY — ADMIN PANEL LOGIC
    ----------------------------------------------------------------------------
    Catalog CRUD + reordering + catalog.js export, plus the direct-to-Backblaze
-   upload flow. No backend anywhere: edits persist in localStorage via store.js,
-   and uploads are presigned in this page (signv4.js) and PUT straight to B2.
+   upload flow. Edits persist locally via store.js; “Publish live” writes the
+   catalog to the deployed Worker's D1 database, and uploads are presigned in
+   this page (signv4.js) and PUT straight to B2.
    ========================================================================== */
 
 (function () {
@@ -11,6 +12,8 @@
   var SigV4 = window.EshSigV4;
 
   var CONNECTION_KEY = "esh_b2_connection";
+  /* Screen-level code; the Worker also checks it on live catalog writes. */
+  var ADMIN_CODE = "050603";
 
   var listEl = document.getElementById("admin-list");
   var statusEl = document.getElementById("admin-status");
@@ -18,7 +21,9 @@
   var editorTitle = document.getElementById("editor-title");
   var form = document.getElementById("editor-form");
   var errorEl = document.getElementById("editor-error");
-  var videoField = document.getElementById("f-video");
+  var videoLinksEl = document.getElementById("video-links");
+  var photoLinksEl = document.getElementById("photo-links");
+  var publishStatusEl = document.getElementById("publish-status");
   var thumbPreview = document.getElementById("thumb-preview");
 
   var uploadStatus = document.getElementById("upload-status");
@@ -34,6 +39,36 @@
 
   var editingIndex = -1; /* -1 = creating a new clip */
 
+  /* ------------------------------------------------------------ admin lock */
+
+  /* A screen lock for the panel, not server security: the code lives in this
+     file, so it keeps casual visitors out and nothing more. Deliberately shown
+     on every load rather than remembered. */
+  (function () {
+    var overlay = document.getElementById("admin-lock");
+    var lockForm = document.getElementById("admin-lock-form");
+    var input = document.getElementById("admin-code");
+    var error = document.getElementById("admin-lock-error");
+    if (!overlay || !lockForm || !input) return;
+
+    lockForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (input.value.trim() !== ADMIN_CODE) {
+        error.hidden = false;
+        input.value = "";
+        input.focus();
+        return;
+      }
+
+      document.documentElement.classList.remove("admin-locked");
+      overlay.remove();
+      var add = document.getElementById("btn-add");
+      if (add) add.focus();
+    });
+
+    input.focus();
+  })();
+
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -42,6 +77,77 @@
 
   function today() {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  /* One media link per numbered row: Video 1, Video 2, … and Photo 1, Photo 2, … */
+  function renumberLinks(container, kind) {
+    var prefix = kind === "video" ? "Video " : "Photo ";
+    [].forEach.call(container.querySelectorAll(".link-row"), function (row, i) {
+      var label = row.querySelector(".link-label");
+      if (label) label.textContent = prefix + (i + 1);
+    });
+  }
+
+  function addLinkRow(container, value, kind) {
+    var row = document.createElement("div");
+    row.className = "link-row";
+
+    var label = document.createElement("label");
+    label.className = "link-label";
+
+    var input = document.createElement("input");
+    input.type = "text";
+    input.autocomplete = "off";
+    input.value = value || "";
+    input.placeholder = kind === "video" ? "https://…/clip.mp4" : "https://…/photo.jpg";
+
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "link-remove";
+    remove.title = "Remove this link";
+    remove.innerHTML = "&times;";
+
+    input.addEventListener("input", function () {
+      if (kind === "video") renderVideoPreview();
+    });
+    remove.addEventListener("click", function () {
+      row.remove();
+      if (!container.querySelector(".link-row")) addLinkRow(container, "", kind);
+      renumberLinks(container, kind);
+      if (kind === "video") renderVideoPreview();
+    });
+
+    row.appendChild(label);
+    row.appendChild(input);
+    row.appendChild(remove);
+    container.appendChild(row);
+    renumberLinks(container, kind);
+    return input;
+  }
+
+  function setLinkRows(container, values, kind) {
+    container.innerHTML = "";
+    (values || []).forEach(function (value) { addLinkRow(container, value, kind); });
+    if (!container.querySelector(".link-row")) addLinkRow(container, "", kind);
+  }
+
+  function readLinkRows(container) {
+    return [].map.call(container.querySelectorAll("input"), function (input) {
+      return input.value.trim();
+    }).filter(Boolean);
+  }
+
+  function appendLinkValue(container, value, kind) {
+    var inputs = container.querySelectorAll("input");
+    for (var i = 0; i < inputs.length; i++) {
+      if (!inputs[i].value.trim()) {
+        inputs[i].value = value;
+        renumberLinks(container, kind);
+        if (kind === "video") renderVideoPreview();
+        return;
+      }
+    }
+    addLinkRow(container, value, kind);
   }
 
   /* ---------------------------------------------------------------- status */
@@ -54,6 +160,243 @@
     statusEl.classList.toggle("dirty", dirty);
     document.getElementById("btn-reset").disabled = !dirty;
     renderConnectionStatus();
+    checkPublished();
+  }
+
+  /* ------------------------------------------------- published vs local -----
+     "Save clip" is not "publish". A clip saved here lives in this browser's
+     localStorage and shadows catalog.js for this browser alone, while visitors
+     keep loading the deployed file — so the symptom of forgetting the publish
+     step is exactly "I added a clip and nobody else can see it", with nothing
+     on this page contradicting the idea that it is live. To close that gap the
+     deployed catalog is fetched back and compared with the working one, and
+     the difference is stated in words above the panels and as a badge on the
+     rows it applies to. Nothing extra to deploy: it reads the same file the
+     visitors' pages load. */
+
+  var PUBLISHED_CATALOG = "catalog.js";
+
+  var publishStateEl = document.getElementById("publish-state");
+  var publishCheck = { at: 0 };
+  var liveState = null; /* clip id -> "new" | "stale", for the row badges */
+
+  function quoted(text, name) {
+    var match = new RegExp(name + '\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"').exec(text);
+    if (!match) return "";
+    try { return JSON.parse('"' + match[1] + '"'); } catch (e) { return match[1]; }
+  }
+
+  var CATALOG_FIELDS = ["id", "title", "description", "poster", "video", "duration", "views", "rating", "added", "tags"];
+  var FIELD_PATTERN = /([A-Za-z_][A-Za-z0-9_]*)\s*:\s*("(?:[^"\\]|\\.)*"|null|true|false|-?\d+(?:\.\d+)?|\[[^\]]*\])/g;
+
+  /* clips[] and gallery[] hold nested objects. Removed before the flat scan so
+     a part's own `video:` cannot overwrite the title's, while the fields around
+     them are still compared — whether they sit after `tags` (as store.js
+     writes them) or anywhere else. */
+  function stripNestedFields(text) {
+    var opener = /\b(clips|gallery)\s*:\s*\[/g;
+    var match;
+    while ((match = opener.exec(text))) {
+      var start = match.index;
+      var i = start + match[0].length - 1; /* at "[" */
+      var depth = 0;
+      var inString = false;
+      var escaped = false;
+
+      for (; i < text.length; i++) {
+        var ch = text[i];
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (ch === "\\") escaped = true;
+          else if (ch === '"') inString = false;
+          continue;
+        }
+        if (ch === '"') inString = true;
+        else if (ch === "[") depth++;
+        else if (ch === "]") {
+          depth--;
+          if (depth === 0) break;
+        }
+      }
+
+      text = text.slice(0, start) + text.slice(i + 1);
+      opener.lastIndex = start;
+    }
+    return text;
+  }
+
+  function addClip(clips, text) {
+    var fields = {};
+    var match;
+
+    text = stripNestedFields(text);
+
+    FIELD_PATTERN.lastIndex = 0;
+    while ((match = FIELD_PATTERN.exec(text))) {
+      var raw = match[2];
+      if (raw === "null") fields[match[1]] = null;
+      else if (raw === "true" || raw === "false") fields[match[1]] = raw === "true";
+      else if (raw.charAt(0) === '"' || raw.charAt(0) === "[") {
+        try { fields[match[1]] = JSON.parse(raw); } catch (e) { fields[match[1]] = raw; }
+      } else fields[match[1]] = Number(raw);
+    }
+    /* An entry with no id is not a clip; an entry with no title is still one. */
+    if (!fields.id) return;
+    clips[String(fields.id)] = fields;
+  }
+
+  /* A tolerant reader for a catalog.js: entries are scanned with quote awareness
+     so a "}" inside a title cannot end one early, and fields are compared by
+     value rather than as text, so reindenting the file is not a change. */
+  function parseCatalog(text) {
+    var out = { clips: {}, media: {} };
+
+    var media = /window\.ESMERINGHOY_MEDIA\s*=\s*\{([\s\S]*?)\};/.exec(text);
+    if (media) {
+      out.media.b2BaseUrl = quoted(media[1], "b2BaseUrl");
+      out.media.signEndpoint = quoted(media[1], "signEndpoint");
+    }
+
+    var array = /window\.ESMERINGHOY_VIDEOS\s*=\s*\[([\s\S]*)\]\s*;/.exec(text);
+    if (!array) return out;
+
+    var body = array[1];
+    var entry = "";
+    var depth = 0;
+    var inString = false;
+    var escaped = false;
+
+    for (var i = 0; i < body.length; i++) {
+      var ch = body[i];
+      if (inString) {
+        entry += ch;
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') { inString = true; entry += ch; continue; }
+      if (ch === "{") { depth++; entry += ch; continue; }
+      if (ch === "}") {
+        depth--;
+        entry += ch;
+        if (depth === 0) { addClip(out.clips, entry); entry = ""; }
+        continue;
+      }
+      if (depth > 0) entry += ch;
+    }
+    return out;
+  }
+
+  function fingerprint(clip) {
+    if (!clip) return "";
+    return CATALOG_FIELDS.map(function (name) {
+      var value = clip[name];
+      if (name === "views" || name === "rating") value = Number(value) || 0;
+      else if (name === "tags") value = (value || []).map(String);
+      else if (value === undefined || value === null || value === "") value = null;
+      else value = String(value);
+      return name + "=" + JSON.stringify(value);
+    }).join("\u0001");
+  }
+
+  function clipNames(list) {
+    var names = list.slice(0, 3).map(function (v) { return "“" + (v.title || v.id) + "”"; });
+    if (list.length > 3) names.push("and " + (list.length - 3) + " more");
+    return names.join(", ");
+  }
+
+  function compareCatalog(published) {
+    var videos = Store.videos();
+    var local = {};
+    videos.forEach(function (v) { local[String(v.id)] = v; });
+
+    var notLive = [];
+    var stale = [];
+    videos.forEach(function (v) {
+      var live = published.clips[String(v.id)];
+      if (!live) notLive.push(v);
+      else if (fingerprint(live) !== fingerprint(v)) stale.push(v);
+    });
+
+    var removed = Object.keys(published.clips)
+      .filter(function (id) { return !local[id]; })
+      .map(function (id) { return published.clips[id]; });
+
+    return {
+      notLive: notLive,
+      stale: stale,
+      removed: removed,
+      wiring: (published.media.b2BaseUrl || "") !== (Store.mediaBaseUrl() || "") ||
+        (published.media.signEndpoint || "") !== (Store.mediaSignEndpoint() || ""),
+      liveCount: Object.keys(published.clips).length
+    };
+  }
+
+  function renderPublishState(result, problem) {
+    if (!publishStateEl) return;
+
+    if (problem) {
+      publishStateEl.className = "publish-state neutral";
+      publishStateEl.textContent = "Cannot read the deployed " + PUBLISHED_CATALOG + " (" + problem +
+        "), so whether visitors see your edits is unknown right now.";
+      return;
+    }
+
+    var found = [];
+    if (result.notLive.length) {
+      found.push(result.notLive.length + " clip(s) saved here that visitors cannot see yet: " +
+        clipNames(result.notLive));
+    }
+    if (result.stale.length) {
+      found.push(result.stale.length + " clip(s) changed since the last publish: " + clipNames(result.stale));
+    }
+    if (result.removed.length) {
+      found.push(result.removed.length + " clip(s) still live that you have deleted here");
+    }
+    if (result.wiring) {
+      found.push("the media wiring (playback base / sign endpoint) differs from the deployed file");
+    }
+
+    if (!found.length) {
+      publishStateEl.className = "publish-state ok";
+      publishStateEl.textContent = "Published — the deployed " + PUBLISHED_CATALOG +
+        " matches this browser (" + result.liveCount + " clip(s)). Visitors see exactly what you see.";
+      return;
+    }
+
+    publishStateEl.className = "publish-state warn";
+    publishStateEl.textContent = "Not published — " + found.join("; ") +
+      ". Click “Publish live”, or download catalog.js and deploy it. This line re-reads the deployed file" +
+      " on every save and turns green once the two match.";
+  }
+
+  function checkPublished(force) {
+    if (!publishStateEl) return;
+    /* renderStatus() runs after every edit, so the fetch is rate limited. */
+    if (!force && Date.now() - publishCheck.at < 2000) return;
+    publishCheck.at = Date.now();
+
+    fetch(PUBLISHED_CATALOG + "?published=" + Date.now(), { cache: "no-store" })
+      .then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.text();
+      })
+      .then(function (text) {
+        var result = compareCatalog(parseCatalog(text));
+        renderPublishState(result);
+
+        var next = {};
+        result.notLive.forEach(function (v) { next[String(v.id)] = "new"; });
+        result.stale.forEach(function (v) { next[String(v.id)] = "stale"; });
+        if (JSON.stringify(next) !== JSON.stringify(liveState)) {
+          liveState = next;
+          renderList();
+        }
+      })
+      .catch(function (err) {
+        renderPublishState(null, (err && err.message) || String(err));
+      });
   }
 
   /* ------------------------------------------------------- B2 connection UI */
@@ -208,20 +551,21 @@
 
   function renderVideoPreview() {
     var el = document.getElementById("f-video-preview");
-    var value = videoField.value.trim();
-    if (!value) {
-      el.textContent = "Set a path like clips/scene-01.mp4, or paste a full URL.";
+    var values = readLinkRows(videoLinksEl);
+    if (!values.length) {
+      el.textContent = "Add at least one video link. Video 1 plays first.";
       el.classList.remove("ok", "warn");
       return;
     }
-    var resolved = resolveMediaUrl(value);
+    var resolved = resolveMediaUrl(values[0]);
     if (!resolved) {
-      el.textContent = "→ " + value + " (set a playback base URL above, or paste a full URL)";
+      el.textContent = values.length + " link(s) · " + values[0] +
+        " (set a playback base URL above, or paste full URLs)";
       el.classList.add("warn");
       el.classList.remove("ok");
       return;
     }
-    el.textContent = "→ " + resolved +
+    el.textContent = (values.length > 1 ? values.length + " clips · first → " : "→ ") + resolved +
       (window.eshIsHls(resolved) ? "  (HLS: quality switches automatically)" : "");
     el.classList.add("ok");
     el.classList.remove("warn");
@@ -482,7 +826,7 @@
         prettyBytes(loaded) + " of " + prettyBytes(file.size) + " · " +
         prettyBytes(bytesPerSecond) + "/s");
     }).then(function () {
-      videoField.value = key;
+      appendLinkValue(videoLinksEl, key, "video");
       renderVideoPreview();
 
       if (!document.getElementById("f-title").value.trim()) {
@@ -510,7 +854,7 @@
         var resolved = resolveMediaUrl(key);
         setUploadStatus("Uploaded to " + conn.bucket + "/" + key +
           (resolved ? "\n" + resolved : "") +
-          "\nSave the clip, then Download catalog.js to publish.", "ok");
+          "\nSave the clip, then click Publish live.", "ok");
       });
     }).catch(function (err) {
       setUploadStatus(String(err && err.message || err), "error");
@@ -547,7 +891,11 @@
             "<span><code>" + esc(v.id) + "</code></span>" +
             '<span class="' + (url ? "ok" : "warn") + '">' +
               (url ? (window.eshIsHls(url) ? "HLS ladder" : "video linked") : "no video") + "</span>" +
+            (liveState && liveState[v.id] === "new" ? '<span class="pill">not live</span>' : "") +
+            (liveState && liveState[v.id] === "stale" ? '<span class="pill">unpublished edits</span>' : "") +
             "<span>" + esc(v.duration || "—") + "</span>" +
+            ((v.clips && v.clips.length) ? "<span>" + v.clips.length + " parts</span>" : "") +
+            ((v.gallery && v.gallery.length) ? "<span>" + v.gallery.length + " photos</span>" : "") +
             "<span>" + esc(v.rating) + "%</span>" +
           "</div>" +
           '<div class="admin-row-tags">' +
@@ -662,6 +1010,7 @@
     resetUploadUi();
 
     document.getElementById("f-title").value = v ? v.title : "";
+    document.getElementById("f-description").value = v ? (v.description || "") : "";
     document.getElementById("f-id").value = v ? v.id : "";
     document.getElementById("f-duration").value = v ? (v.duration || "") : "";
     document.getElementById("f-poster").value = v && v.poster ? v.poster : "";
@@ -670,7 +1019,10 @@
     document.getElementById("f-added").value = v ? (v.added || today()) : today();
     document.getElementById("f-tags").value = v ? (v.tags || []).join(", ") : "";
 
-    videoField.value = v && v.video ? v.video : "";
+    var clipLinks = v ? window.eshClips(v).map(function (clip) { return clip.video; }) : [];
+    setLinkRows(videoLinksEl, clipLinks, "video");
+    setLinkRows(photoLinksEl, v ? window.eshGallery(v) : [], "photo");
+    document.getElementById("f-new-hint").hidden = Boolean(v);
 
     updateThumbPreview();
     renderVideoPreview();
@@ -697,13 +1049,15 @@
 
     var poster = document.getElementById("f-poster").value.trim();
 
-    var mediaUrl = videoField.value.trim();
+    var videoLinks = readLinkRows(videoLinksEl);
+    var photoLinks = readLinkRows(photoLinksEl);
 
     var video = {
       id: document.getElementById("f-id").value.trim(),
       title: title,
+      description: document.getElementById("f-description").value.trim(),
       poster: poster || null,
-      video: mediaUrl || null,
+      video: videoLinks[0] || null,
       duration: document.getElementById("f-duration").value.trim() || "00:00",
       views: Number(document.getElementById("f-views").value) || 0,
       rating: Math.max(0, Math.min(100, Number(document.getElementById("f-rating").value) || 0)),
@@ -713,6 +1067,15 @@
         .map(function (t) { return t.trim(); })
         .filter(Boolean)
     };
+
+    /* One row is one part, in the order shown on the player. Labels follow
+       that order — 1, 2, 3 — regardless of the filenames. */
+    if (videoLinks.length > 1) {
+      video.clips = videoLinks.map(function (link, i) {
+        return { label: String(i + 1), video: link };
+      });
+    }
+    if (photoLinks.length) video.gallery = photoLinks;
 
     var videos = Store.videos();
 
@@ -731,8 +1094,13 @@
       }
     }
 
-    if (editingIndex >= 0) videos[editingIndex] = video;
-    else videos.push(video);
+    if (editingIndex >= 0) {
+      videos[editingIndex] = video;
+    } else {
+      /* Latest upload first: the catalog order is the featured order. */
+      videos.unshift(video);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
 
     Store.save(videos);
     renderStatus();
@@ -745,7 +1113,13 @@
   document.getElementById("btn-add").addEventListener("click", function () { openEditor(-1); });
   document.getElementById("btn-cancel").addEventListener("click", closeEditor);
   document.getElementById("f-poster").addEventListener("input", updateThumbPreview);
-  videoField.addEventListener("input", renderVideoPreview);
+  document.getElementById("add-video-link").addEventListener("click", function () {
+    addLinkRow(videoLinksEl, "", "video").focus();
+    renderVideoPreview();
+  });
+  document.getElementById("add-photo-link").addEventListener("click", function () {
+    addLinkRow(photoLinksEl, "", "photo").focus();
+  });
   document.getElementById("f-title").addEventListener("input", function () {
     var idField = document.getElementById("f-id");
     if (editingIndex < 0 && !idField.dataset.touched) {
@@ -809,6 +1183,50 @@
     a.click();
     a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  });
+
+  function setPublishStatus(message, kind) {
+    if (!publishStatusEl) return;
+    publishStatusEl.textContent = message || "";
+    publishStatusEl.classList.remove("ok", "warn", "error");
+    if (kind) publishStatusEl.classList.add(kind);
+  }
+
+  document.getElementById("btn-publish").addEventListener("click", function () {
+    var btn = this;
+    var payload = {
+      videos: Store.videos(),
+      categories: window.ESMERINGHOY_CATEGORIES || [],
+      media: {
+        b2BaseUrl: Store.mediaBaseUrl(),
+        signEndpoint: Store.mediaSignEndpoint()
+      }
+    };
+
+    btn.disabled = true;
+    setPublishStatus("Publishing live…");
+
+    fetch("/catalog", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "X-Admin-Code": ADMIN_CODE },
+      body: JSON.stringify(payload)
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (!response.ok) {
+          throw new Error(data.message || data.error || ("HTTP " + response.status));
+        }
+        return data;
+      });
+    }).then(function (data) {
+      setPublishStatus("Live — " + (Number(data.clips) || payload.videos.length) +
+        " clip(s) published. Visitors get this on their next page load.", "ok");
+      checkPublished(true);
+    }).catch(function (err) {
+      setPublishStatus("Not published — " + (err && err.message || err) +
+        ". Live publishing needs the deployed Worker with the D1 database.", "error");
+    }).then(function () {
+      btn.disabled = false;
+    });
   });
 
   document.getElementById("btn-copy").addEventListener("click", function () {
@@ -1142,7 +1560,7 @@
     renderStatus();
     renderList();
     statsStatus("Updated the Views field for " + changed + " clip(s) in your local edits. " +
-      "Download catalog.js to publish them.", "ok");
+      "Click Publish live to send them to the site.", "ok");
   }
 
   function loadStatsConnection() {
