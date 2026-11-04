@@ -1,26 +1,37 @@
 /* ============================================================================
    ESMERINGHOY — CONTENT CATALOG
    ----------------------------------------------------------------------------
-   This is the ONLY file that holds your clip data. The admin panel rewrites
-   this file for you — you never need to hand-edit it.
+   This file is the fallback catalog. The admin panel can also publish a live
+   catalog to the Worker's D1 database, which visitors load instead; you never
+   need to hand-edit either one.
 
    Each entry:
-     id       (string)   unique slug, used in the URL: player.html?id=<id>
-     title    (string)   display title
-     poster   (string|null)  thumbnail URL. null = auto-generated placeholder.
-     video    (string|null)  the media file the player loads. Either a full
+     id          (string)   unique slug, used in the URL: player.html?id=<id>
+     title       (string)   display title
+     description (string)   optional intro shown under the player title
+     poster   (string|null)  thumbnail. A leading "/" means a file this site
+                             serves itself (e.g. "/assets/thumbs/clip.jpg"); a
+                             path without one is a bucket key, signed when the
+                             bucket is private. null = auto-generated placeholder.
+     video    (string|null)  the media file the player loads first. Either a full
                              URL (https://.../clip.mp4) or a path relative to
                              the Backblaze base URL below ("clips/01.mp4").
                              mp4 / webm / m3u8 are all supported. null shows a
                              "no video yet" state.
+     clips    (array)    optional. Every part of a title, in order, shown as
+                             buttons under the player: [{ label, video }, ...].
+                             Same URL/path rules as `video`. When this is set,
+                             `video` should be the first part so cards and
+                             links play something.
+     gallery  (array)    optional. Photos shown under the clips: URLs or bucket
+                             paths. Clicking one opens it full screen.
      duration (string)   e.g. "12:34"
      views    (number)   raw view count
      rating   (number)   0-100
      added    (string)   ISO date, drives the "Newest" sort
      tags     (string[]) free-form; shown as the category nav
 
-   NOTE: entries below are neutral PLACEHOLDERS. Replace with content you own
-   or are licensed to distribute.
+   NOTE: only publish content you own or are licensed to distribute.
    ========================================================================== */
 
 /* ----------------------------------------------------------------------------
@@ -47,72 +58,100 @@ window.ESMERINGHOY_MEDIA = {
   signEndpoint: "/token"
 };
 
+/* The nav follows these, so every entry here should match a tag in use —
+   a category nobody has tagged shows an empty page. */
 window.ESMERINGHOY_CATEGORIES = [
-  "Trending",
   "New Releases",
-  "Top Rated",
-  "Amateur",
-  "Studio",
-  "HD",
-  "4K",
-  "POV",
-  "Couples",
-  "Solo"
+  "Solo",
+  "HD"
 ];
 
 window.ESMERINGHOY_VIDEOS = [
-  { id: "clip-01", title: "Placeholder Clip 01", poster: null, video: null,
-    duration: "12:34", views: 128400, rating: 92, added: "2026-10-08",
-    tags: ["Trending", "HD", "Studio"] },
-  { id: "clip-02", title: "Placeholder Clip 02", poster: null, video: null,
-    duration: "08:12", views: 98400, rating: 88, added: "2026-10-07",
-    tags: ["Trending", "Amateur", "HD"] },
-  { id: "clip-03", title: "Placeholder Clip 03", poster: null, video: null,
-    duration: "21:05", views: 312500, rating: 95, added: "2026-09-29",
-    tags: ["Top Rated", "Studio", "4K"] },
-  { id: "clip-04", title: "Placeholder Clip 04", poster: null, video: null,
-    duration: "05:48", views: 42300, rating: 74, added: "2026-10-09",
-    tags: ["New Releases", "Solo", "HD"] },
-  { id: "clip-05", title: "Placeholder Clip 05", poster: null, video: null,
-    duration: "17:22", views: 201300, rating: 90, added: "2026-10-02",
-    tags: ["Couples", "Studio", "4K"] },
-  { id: "clip-06", title: "Placeholder Clip 06", poster: null, video: null,
-    duration: "10:59", views: 76500, rating: 83, added: "2026-10-05",
-    tags: ["Amateur", "POV", "HD"] },
-  { id: "clip-07", title: "Placeholder Clip 07", poster: null, video: null,
-    duration: "14:11", views: 154900, rating: 89, added: "2026-09-25",
-    tags: ["Top Rated", "Studio", "HD"] },
-  { id: "clip-08", title: "Placeholder Clip 08", poster: null, video: null,
-    duration: "06:37", views: 33100, rating: 71, added: "2026-10-10",
-    tags: ["New Releases", "Solo", "Amateur"] },
-  { id: "clip-09", title: "Placeholder Clip 09", poster: null, video: null,
-    duration: "19:44", views: 268700, rating: 94, added: "2026-09-18",
-    tags: ["Trending", "Studio", "4K"] },
-  { id: "clip-10", title: "Placeholder Clip 10", poster: null, video: null,
-    duration: "09:26", views: 88700, rating: 86, added: "2026-10-06",
-    tags: ["POV", "Amateur", "HD"] },
-  { id: "clip-11", title: "Placeholder Clip 11", poster: null, video: null,
-    duration: "23:18", views: 342100, rating: 96, added: "2026-09-12",
-    tags: ["Top Rated", "Studio", "4K"] },
-  { id: "clip-12", title: "Placeholder Clip 12", poster: null, video: null,
-    duration: "11:52", views: 112600, rating: 87, added: "2026-10-01",
-    tags: ["Couples", "HD", "Studio"] },
-  { id: "clip-13", title: "Placeholder Clip 13", poster: null, video: null,
-    duration: "07:39", views: 54900, rating: 78, added: "2026-10-09",
-    tags: ["New Releases", "Amateur", "HD"] },
-  { id: "clip-14", title: "Placeholder Clip 14", poster: null, video: null,
-    duration: "15:07", views: 176200, rating: 91, added: "2026-09-22",
-    tags: ["Trending", "Studio", "HD"] },
-  { id: "clip-15", title: "Placeholder Clip 15", poster: null, video: null,
-    duration: "13:29", views: 94300, rating: 84, added: "2026-10-03",
-    tags: ["Solo", "POV", "Amateur"] },
-  { id: "clip-16", title: "Placeholder Clip 16", poster: null, video: null,
-    duration: "18:53", views: 229800, rating: 93, added: "2026-09-16",
-    tags: ["Top Rated", "Couples", "4K"] },
-  { id: "clip-17", title: "Placeholder Clip 17", poster: null, video: null,
-    duration: "04:21", views: 28700, rating: 69, added: "2026-10-10",
-    tags: ["New Releases", "Solo", "HD"] },
-  { id: "clip-18", title: "Placeholder Clip 18", poster: null, video: null,
-    duration: "16:45", views: 187500, rating: 90, added: "2026-09-27",
-    tags: ["Trending", "POV", "Studio"] }
+  /* First real clip: 18 parts, plus a photo set from the same shoot. The
+     poster is the shot that was picked for the card. Every URL is absolute,
+     so nothing here depends on the media base URL being filled in. */
+  { id: "si-clouie-na-mahilig-sa-saging",
+    title: "Si Clouie na Mahilig sa Saging, Sa Kwarto Inabot ng Umagahin",
+    description: "",
+    poster: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/005.jpg",
+    video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/17.mp4",
+    clips: [
+      { label: "1", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/17.mp4" },
+      { label: "2", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/18.mp4" },
+      { label: "3", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/16.mp4" },
+      { label: "4", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/15.mp4" },
+      { label: "5", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/14.mp4" },
+      { label: "6", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/13.mp4" },
+      { label: "7", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/12.mp4" },
+      { label: "8", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/11.mp4" },
+      { label: "9", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/10.mp4" },
+      { label: "10", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/09.mp4" },
+      { label: "11", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/08.mp4" },
+      { label: "12", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/07.mp4" },
+      { label: "13", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/06.mp4" },
+      { label: "14", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/05.mp4" },
+      { label: "15", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/04.mp4" },
+      { label: "16", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/03.mp4" },
+      { label: "17", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/02.mp4" },
+      { label: "18", video: "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/01.mp4" }
+    ],
+    gallery: [
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/001.jpg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/002.jpg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/003.jpg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/004.jpg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/005.jpg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/01.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/02.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/03.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/04.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/05.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/06.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/07.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/08.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/09.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/10.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/11.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/12.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/13.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/14.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/15.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/16.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/17.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/18.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/19.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/20.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/21.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/22.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/23.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/24.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/25.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/26.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/27.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/28.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/29.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/30.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/31.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/32.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/33.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/34.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/35.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/36.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/37.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/38.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/39.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/40.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/41.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/42.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/43.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/44.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/45.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/46.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/47.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/48.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/49.jpeg",
+      "https://f005.backblazeb2.com/file/deymflix01/Esmeringhoy/Clouie+Siote/50.jpeg"
+    ],
+    duration: "", views: 0, rating: 0, added: "2026-11-03",
+    tags: ["New Releases", "Solo", "HD"] }
 ];
