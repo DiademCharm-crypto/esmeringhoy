@@ -1,19 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="admin-locked">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <!-- Keep the admin tool out of search engines -->
   <meta name="robots" content="noindex, nofollow">
   <title>ESMERINGHOY — Catalog Admin</title>
+  <link rel="icon" type="image/svg+xml" href="assets/branding/favicon.svg">
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="admin-page">
 
+  <div class="admin-lock" id="admin-lock">
+    <form class="admin-lock-card" id="admin-lock-form">
+      <span class="admin-lock-badge">ESMERINGHOY</span>
+      <h2>Admin lock</h2>
+      <p>Enter the admin code to open the catalog.</p>
+      <input type="password" id="admin-code" inputmode="numeric" autocomplete="off"
+             maxlength="12" placeholder="Admin code" aria-label="Admin code" required>
+      <p class="admin-lock-error" id="admin-lock-error" hidden>Wrong code. Try again.</p>
+      <button type="submit" class="btn-primary">Unlock</button>
+    </form>
+  </div>
+
   <div class="site-content">
     <header>
       <div class="brand-row">
-        <h1><a href="index.html">ESMERINGHOY</a></h1>
+        <h1 class="brand-heading"><a href="index.html" aria-label="ESMERINGHOY — home"><img class="brand-logo" src="assets/branding/esmeringhoy-logo-horizontal.svg" alt="ESMERINGHOY" width="1097" height="200"></a></h1>
         <div class="search-container">
           <span class="admin-badge">Admin</span>
           <a href="index.html" class="back-btn">View site</a>
@@ -29,18 +42,26 @@
         </div>
         <div class="admin-actions">
           <button type="button" id="btn-add" class="btn-primary">+ Add clip</button>
+          <button type="button" id="btn-publish" class="btn-primary">Publish live</button>
           <button type="button" id="btn-copy" class="btn-ghost">Copy catalog.js</button>
           <button type="button" id="btn-download" class="btn-ghost">Download catalog.js</button>
           <button type="button" id="btn-reset" class="btn-ghost danger">Discard edits</button>
         </div>
+        <p class="publish-status" id="publish-status" aria-live="polite"></p>
       </div>
 
       <div class="admin-note">
-        <strong>How publishing works.</strong> Edits are saved in this browser so you
-        can preview them instantly on the site. Visitors see nothing until you
-        <em>Download catalog.js</em> and replace the file next to this one.
-        This page needs no server — and has no login, so don't host it publicly.
+        <strong>How publishing works.</strong> Everything is entered as links —
+        thumbnail, video parts and photos. A new title is saved <em>at the top</em>
+        of the catalog, so the latest upload appears first. Edits are saved in this
+        browser immediately for preview; click <em>Publish live</em> to send the
+        catalog to the site, and every page picks it up on the next load without a
+        redeploy. Copy/Download stay available as offline backups. The lock screen
+        and publish code are client-side screens, not server security, so keep
+        <code>admin.html</code> out of search results and casual hands.
       </div>
+
+      <p class="publish-state" id="publish-state" aria-live="polite">Checking what visitors see…</p>
 
       <details class="admin-panel" id="b2-panel" open>
         <summary>
@@ -250,6 +271,12 @@
           <input type="text" id="f-title" autocomplete="off" required>
         </div>
 
+        <div class="field">
+          <label for="f-description">Description</label>
+          <textarea id="f-description" rows="3"
+                    placeholder="Shown under the title on the player."></textarea>
+        </div>
+
         <div class="field-row">
           <div class="field">
             <label for="f-id">ID (URL slug)</label>
@@ -289,16 +316,33 @@
         </div>
 
         <div class="field">
-          <label for="f-video">Video URL</label>
-          <input type="text" id="f-video" autocomplete="off"
-                 placeholder="https://… or clips/myclip.mp4">
+          <label>Video links <span class="req">*</span></label>
+          <div class="link-list" id="video-links"></div>
+          <div class="link-actions">
+            <button type="button" id="add-video-link" class="btn-ghost">+ Add video</button>
+          </div>
           <p class="field-hint" id="f-video-preview"></p>
           <p class="field-hint">
-            Paste a full URL, or just the path inside your bucket — it resolves
-            against the playback base URL. mp4 and m3u8 both work; an m3u8 gets
-            automatic quality switching.
+            Video 1 plays first, then video 2, and so on — parts play in exactly this
+            order. Full links or bucket paths both work; mp4 and m3u8 are supported.
           </p>
         </div>
+
+        <div class="field">
+          <label>Photo links</label>
+          <div class="link-list" id="photo-links"></div>
+          <div class="link-actions">
+            <button type="button" id="add-photo-link" class="btn-ghost">+ Add photo</button>
+          </div>
+          <p class="field-hint">
+            Photos appear in the gallery below the clips, in this order; viewers can
+            hide and show them.
+          </p>
+        </div>
+
+        <p class="field-hint" id="f-new-hint" hidden>
+          New titles are placed first, so this upload becomes the latest on the site.
+        </p>
 
         <div class="field upload-field" id="upload-field">
           <label>Upload a video file</label>

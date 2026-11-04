@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESMERINGHOY — brand assets</title>
+<style>
+  :root { --ink:#0B0B0F; --crimson:#E5093B; --pink:#FF2D75; --line:rgba(255,255,255,.14); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ink); color:#fff;
+         font:15px/1.6 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif; }
+  header { padding:44px 32px 10px; max-width:1180px; margin:0 auto; }
+  h1 { margin:0 0 6px; font-size:26px; letter-spacing:.02em; }
+  p.lede { margin:0; color:#a9a9b4; max-width:64ch; }
+  main { max-width:1180px; margin:0 auto; padding:26px 32px 80px; }
+  h2 { font-size:13px; letter-spacing:.16em; text-transform:uppercase;
+       color:#8d8d99; margin:38px 0 14px; font-weight:600; }
+  .grid { display:grid; gap:18px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+  .card { border:1px solid var(--line); border-radius:14px; overflow:hidden;
+          background:#111118; }
+  .card .stage { display:flex; align-items:center; justify-content:center;
+                 padding:26px 22px; min-height:150px; }
+  .stage.dark { background:radial-gradient(120% 120% at 50% 0%,#191922 0%,#0d0d12 70%); }
+  .stage.light { background:#fff; }
+  .stage img { max-width:100%; height:auto; }
+  .meta { border-top:1px solid var(--line); padding:10px 14px;
+          display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  .meta code { font-size:12px; color:#c8c8d2; }
+  .meta span { font-size:11px; color:#6f6f7c; white-space:nowrap; }
+  .sizes { display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; }
+  .sizes figure { margin:0; text-align:center; }
+  .sizes figcaption { font-size:10px; color:#6f6f7c; margin-top:8px; letter-spacing:.08em; }
+  .note { border-left:2px solid var(--crimson); padding:2px 0 2px 14px; color:#a9a9b4;
+          max-width:70ch; margin:18px 0 0; }
+  .pairs { display:grid; gap:18px; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
+</style>
+</head>
+<body>
+<header>
+  <h1>ESMERINGHOY — brand assets</h1>
+  <p class="lede">Custom vector wordmark, lockup and icon. No font files, no raster
+  images: every shape is an editable path, so the logo scales from a browser tab
+  to a billboard without a second source file.</p>
+</header>
+<main>
+
+  <h2>Primary lockup</h2>
+  <div class="grid">
+    <div class="card">
+      <div class="stage dark"><img src="esmeringhoy-logo-horizontal.svg" alt="ESMERINGHOY horizontal logo" width="620"></div>
+      <div class="meta"><code>esmeringhoy-logo-horizontal.svg</code><span>transparent · dark</span></div>
+    </div>
+    <div class="card">
+      <div class="stage light"><img src="esmeringhoy-logo-horizontal-on-light.svg" alt="ESMERINGHOY logo for light backgrounds" width="620"></div>
+      <div class="meta"><code>esmeringhoy-logo-horizontal-on-light.svg</code><span>white · dark ink</span></div>
+    </div>
+  </div>
+
+  <h2>Background-ready versions</h2>
+  <div class="pairs">
+    <div class="card">
+      <div class="stage dark"><img src="esmeringhoy-logo-horizontal-on-dark.svg" alt="Logo on ink background" width="560"></div>
+      <div class="meta"><code>esmeringhoy-logo-horizontal-on-dark.svg</code><span>social, OG image</span></div>
+    </div>
+    <div class="card">
+      <div class="stage dark"><img src="esmeringhoy-wordmark.svg" alt="Wordmark only" width="560"></div>
+      <div class="meta"><code>esmeringhoy-wordmark.svg</code><span>no icon</span></div>
+    </div>
+  </div>
+
+  <h2>Icon</h2>
+  <div class="grid">
+    <div class="card">
+      <div class="stage dark">
+        <div class="sizes">
+          <figure><img src="esmeringhoy-icon.svg" alt="Icon" width="132"><figcaption>132</figcaption></figure>
+          <figure><img src="esmeringhoy-icon.svg" alt="" width="64"><figcaption>64</figcaption></figure>
+          <figure><img src="esmeringhoy-icon.svg" alt="" width="40"><figcaption>40</figcaption></figure>
+          <figure><img src="favicon.svg" alt="Favicon" width="32"><figcaption>favicon 32</figcaption></figure>
+        </div>
+      </div>
+      <div class="meta"><code>esmeringhoy-icon.svg</code><span>transparent · app icon</span></div>
+    </div>
+    <div class="card">
+      <div class="stage light">
+        <div class="sizes">
+          <figure><img src="esmeringhoy-icon-on-light.svg" alt="Icon on white" width="132"><figcaption>132</figcaption></figure>
+          <figure><img src="esmeringhoy-icon-on-light.svg" alt="" width="56"><figcaption>56</figcaption></figure>
+          <figure><img src="favicon.svg" alt="" width="32"><figcaption>favicon</figcaption></figure>
+        </div>
+      </div>
+      <div class="meta"><code>esmeringhoy-icon-on-light.svg</code><span>white field</span></div>
+    </div>
+  </div>
+
+  <h2>Lettering detail</h2>
+  <div class="card">
+    <div class="stage dark"><img src="esmeringhoy-wordmark.svg" alt="Wordmark detail" width="820"></div>
+    <div class="meta"><code>the O carries a bite; the accent resolves into a heart</code><span>cap 120 · stroke 22</span></div>
+  </div>
+  <p class="note">The wordmark is drawn from eleven hand-built glyph skeletons — no font
+  is embedded or referenced. Bars, bowls and diagonals share one 22-unit weight,
+  and the whole word is slanted 9° for momentum. Edit a glyph in
+  <code>tools/branding/build-branding.mjs</code> and every variant follows.</p>
+
+  <h2>PNG exports</h2>
+  <div class="grid" id="pngs"></div>
+  <p class="note">Rasterised from these same vectors at 512 and 1024 with a
+  transparent background.</p>
+</main>
+<script>
+  /* List the PNG exports that exist next to this page, without hard-coding a
+     name that a rename would silently break. */
+  var pngs = [
+    ["esmeringhoy-logo-horizontal-1024.png", "lockup · 1024"],
+    ["esmeringhoy-logo-horizontal-512.png", "lockup · 512"],
+    ["esmeringhoy-icon-1024.png", "icon · 1024"],
+    ["esmeringhoy-icon-512.png", "icon · 512"]
+  ];
+  var host = document.getElementById("pngs");
+  pngs.forEach(function (p) {
+    var card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = '<div class="stage dark"><img src="' + p[0] + '" alt="' + p[1] +
+      '" style="max-height:150px"></div><div class="meta"><code>' + p[0] +
+      "</code><span>" + p[1] + "</span></div>";
+    var img = card.querySelector("img");
+    img.onerror = function () { card.remove(); };
+    host.appendChild(card);
+  });
+</script>
+</body>
+</html>

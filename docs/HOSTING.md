@@ -2,7 +2,8 @@
 
 This is the whole delivery path: video lives in a **private** B2 bucket, a
 **Cloudflare Worker** signs and serves it, and the admin panel uploads straight
-to B2 from the browser with no server anywhere.
+to B2 from the browser. The catalog itself publishes through the Worker's D1
+database, so admin changes reach every visitor without replacing a file.
 
 ```
                         ┌──────────────────────────────┐
@@ -83,9 +84,17 @@ automatically, probes the file for its real duration, and grabs a thumbnail
 frame from the video and uploads it as `<name>-poster.jpg` — so the site's
 thumbnail is a frame from the film rather than a generated placeholder.
 
-Then **Download catalog.js** and replace the file. That is the publish step: on
-a static site the admin cannot write to the server, so edits stay local until you
-do.
+Then click **Publish live**. The catalog is written to the Worker's D1 database
+and served at `/catalog.js`, so every visitor gets it on their next page load
+without another deploy. Copy/Download remain as an offline backup. A clip you
+save is visible in your browser immediately; it is not visible to visitors until
+you publish. The line under *How publishing works* re-reads the deployed
+`catalog.js`: green **Published** means visitors see exactly what you see, and a
+**Not published** warning names the clips they cannot see yet.
+
+This requires opening the admin panel on the deployed Worker/domain. GitHub
+Pages alone is static and cannot accept live publishes — use the Cloudflare
+address, not a `github.io` address.
 
 **What the panel knows about your key.** It is used in memory for that tab unless
 you tick *Remember*, in which case it is stored unencrypted in this browser only.
@@ -127,7 +136,7 @@ the statistics database live on your own domain from the command line, follow
 6. In the admin panel set:
    - **Playback base URL** → the Worker's URL, e.g. `https://esh-media.you.workers.dev`
    - **Signed-URL endpoint** → the same URL plus `/token`
-   - **Save connection**, then **Download catalog.js**.
+   - **Save connection**, then **Publish live**.
 7. Add the Worker to a custom domain in Cloudflare (Workers → your Worker →
    *Settings → Domains & Routes*), e.g. `media.your-site.com`, and use that as the
    base URL. `*.workers.dev` works fine too.
@@ -215,5 +224,7 @@ Setup takes about five minutes: `docs/STATISTICS.md`.
 | Media 403 with a valid token | Worker's clock/TTL, or `MEDIA_SIGNING_KEY` changed after the page loaded |
 | Media 404 | The key does not exist — check the prefix and spelling |
 | Worker 500 `no_signing_key` | `MEDIA_SIGNING_KEY` is not set |
-| Plays in the admin but not on the site | The published `catalog.js` still has the old base URL |
+| Plays in the admin but not on the site | Either the catalog was never published — watch the panel's publish line — or the published `catalog.js` still has the old base URL |
+| A clip plays for you but nobody else sees it | Click **Publish live** in the admin panel. If it errors, the admin is not being served by the Worker or D1 is not bound as `DB`. GitHub Pages alone is static and cannot accept publishes |
+| Everything 404s / `502 b2_unreachable` on the live domain | The Worker is missing `BUCKET_NAME` or the B2 key pair — run `node tools/b2-check.mjs` |
 | Poster broken but video fine | Thumbnail was uploaded before signing was configured |

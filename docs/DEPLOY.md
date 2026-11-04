@@ -63,6 +63,26 @@ changes nothing.
 
 ## Part 3 — secrets and variables
 
+Prove the bucket and the keys before pasting either into Wrangler. This stores a
+1 KB probe object under `esmeringhoy-probe/`, reads it back, checks a range
+request, and deletes it again — the same presigned PUT that uploads a ladder and
+the same native fetch the Worker makes when it serves a clip:
+
+```bash
+B2_KEY_ID=your-key-id B2_APPLICATION_KEY=your-application-key \
+  B2_BUCKET=your-b2-bucket B2_REGION=us-west-004 \
+  node tools/b2-check.mjs
+```
+
+Every line it prints is a prerequisite this project depends on, so a failure
+there names the thing to fix (a read-only key, a bucket without the S3 API, a
+public bucket, a region that does not match the endpoint). Two of the checks
+expect a refusal — a forged signature and an expired one — because an endpoint
+that accepted either would make the rest of the run meaningless. It also covers
+the **native** download path, which is what serves media, so it is worth running
+even when no upload is planned. Passing it means a later failure is a code or
+configuration problem, not a credentials one.
+
 Four secrets, never in `wrangler.toml` and never in the browser:
 
 ```bash
@@ -206,6 +226,25 @@ part of CI — they live in Cloudflare and survive every deploy, so a missing
 token never breaks the live site. Without those two secrets the `Deploy` job
 fails with an explicit message rather than silently skipping.
 
+## GitHub and live admin updates
+
+A push to `main` runs the tests, then `wrangler deploy` uploads the Worker and
+site. That deploy does **not** reset the D1 database: the published catalog,
+views, votes, comments and statistics stay in `esh-stats` across deployments.
+
+Once the Worker is live, open the admin panel on the same domain
+(`https://yourdomain.com/admin.html`) and click **Publish live**. The catalog is
+written to D1, and `/catalog.js` serves it to every visitor on their next page
+load. There is no file to copy and no second deploy. Once a live catalog exists,
+it takes precedence over the static `catalog.js`; make visitor-facing changes
+through **Publish live**, not by editing that file in the repo.
+
+Do **not** use GitHub Pages for the admin side of this site. GitHub Pages serves
+static files only: it cannot accept `PUT /catalog`, and a `catalog.js` commit
+would not update the D1 catalog. The GitHub repository is the source that CI
+deploys; the Worker domain is the live site. If you browse the admin panel from
+a `github.io` address, **Publish live** will fail by design.
+
 ## Running the suites
 
 The Worker suite drives the real handler against the real B2 stand-in, so it
@@ -234,6 +273,15 @@ answering. Persist the state somewhere else:
 npx wrangler dev --persist-to ../esh-state
 ```
 
+Two things about the stand-in are worth knowing when you exercise the upload path
+against it. It verifies presigned URLs the way the real bucket does, so an
+unsigned, forged or expired `PUT` is refused with `403` — `tools/b2-check.mjs`
+run with `--endpoint http://127.0.0.1:8090` and `B2_API_URL` pointing at
+`…/b2api/v2` rehearses the whole preflight locally, setup step included. And it
+starts from an empty store every time, so after restarting it the ladder you had
+uploaded is gone and has to be pushed again (`tools/b2-upload.mjs … --prefix ""`
+when the ladder already sits under its final key prefix).
+
 To drive the real handler against the shipped B2 stand-in instead of Backblaze,
 put the fake bindings in `.dev.vars` (gitignored, dev-only, and it overrides
 `[vars]`): `BUCKET_NAME`, the `B2_API_URL` / `B2_DOWNLOAD_URL` pair pointing at
@@ -250,10 +298,25 @@ list it too, or every beacon is refused as cross-site.
 | Every page answers `307` | `html_handling` reverted to the default. Set it back to `"none"`. |
 | `/` answers `{"error":"bad_path"}` | The asset server missed `/` and the Worker's `index.html` fallback was removed. See "What gets uploaded". |
 | `/stats` → `401` | `STATS_TOKEN` not set, or the panel's password field is empty. |
-| `/stats` or `/token` → `403 origin_not_allowed` | The browsing origin is missing from `SITE_ORIGINS`. |
+| `/stats` or `/token` → `403 origin_not_allowed` | The browsing origin is missing from `SITE_ORIGINS`. The player reports this as "this address is not allowed to load videos", and a cross-origin refusal the browser cannot read looks the same on the page. |
 | Media → `403` | The link expired (reload the page for a fresh `/token`) or `MEDIA_SIGNING_KEY` was rotated. |
 | Media → `502 b2_unreachable` | Wrong `B2_KEY_ID` / `B2_APPLICATION_KEY`, or the bucket name is misspelled. |
 | Player shows "no video yet" | `signEndpoint` in `catalog.js` is still blank — set it to `https://yourdomain.com/token`. |
+
+The player now names the fault itself instead of stalling silently: it reads the
+CDN's error body (or hls.js's) and says *the video server cannot reach storage*,
+*the video file is missing*, *this address is not allowed to load videos*,
+*this link has expired* and so on, each with the one setting to change and the
+raw `HTTP <status> · <code>` line underneath. Those sentences come from the table
+in `media-diagnosis.js`, which is pure data and is checked by its own suite:
+
+```bash
+node tools/media-diagnosis.test.mjs
+```
+
+It runs in CI beside the other two. If a code from the Worker has no entry, the
+page falls back to a generic message, so adding a route to the Worker means
+adding its explanation there too.
 
 Rolling back is `npx wrangler rollback`, and `npx wrangler deployments list`
 shows what is live. Deleting the Worker leaves the D1 database and its rows

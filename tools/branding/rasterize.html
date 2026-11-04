@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ESMERINGHOY — rasterise</title>
+<style>
+  body { background:#111; color:#eee; font:14px/1.6 ui-monospace,Consolas,monospace; padding:24px; }
+  li { margin:2px 0; }
+  .ok { color:#5fd68a; }
+  .bad { color:#ff6b6b; }
+</style>
+</head>
+<body>
+<h3>Rasterising brand assets</h3>
+<ul id="log"></ul>
+<script>
+/* Draws each SVG on a canvas at an exact pixel size and posts the PNG to the
+   sink, which writes it into assets/branding/. Transparent background: the
+   canvas is never filled, so alpha survives. */
+var DIR = "assets/branding/";
+var JOBS = [
+  { svg: DIR + "esmeringhoy-logo-horizontal.svg", out: "esmeringhoy-logo-horizontal-512.png",  size: 512,  pad: 0.06 },
+  { svg: DIR + "esmeringhoy-logo-horizontal.svg", out: "esmeringhoy-logo-horizontal-1024.png", size: 1024, pad: 0.06 },
+  { svg: DIR + "esmeringhoy-icon.svg",            out: "esmeringhoy-icon-512.png",             size: 512,  pad: 0 },
+  { svg: DIR + "esmeringhoy-icon.svg",            out: "esmeringhoy-icon-1024.png",            size: 1024, pad: 0 }
+];
+
+var log = document.getElementById("log");
+
+function line(text, cls) {
+  var li = document.createElement("li");
+  if (cls) li.className = cls;
+  li.textContent = text;
+  log.appendChild(li);
+  return li;
+}
+
+function loadImage(src) {
+  return new Promise(function (resolve, reject) {
+    var img = new Image();
+    img.onload = function () { resolve(img); };
+    img.onerror = function () { reject(new Error("could not load " + src)); };
+    img.src = src;
+  });
+}
+
+function canvasToBlob(canvas) {
+  return new Promise(function (resolve) {
+    canvas.toBlob(function (b) { resolve(b); }, "image/png");
+  });
+}
+
+async function run(job) {
+  var img = await loadImage(job.svg);
+  var canvas = document.createElement("canvas");
+  canvas.width = job.size;
+  canvas.height = job.size;
+  var ctx = canvas.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+
+  var inner = job.size * (1 - job.pad * 2);
+  var scale = Math.min(inner / img.width, inner / img.height);
+  var w = img.width * scale;
+  var h = img.height * scale;
+  ctx.drawImage(img, (job.size - w) / 2, (job.size - h) / 2, w, h);
+
+  var blob = await canvasToBlob(canvas);
+  var res = await fetch("/save?name=" + encodeURIComponent(job.out), {
+    method: "POST",
+    body: blob
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return job.out + " → " + job.size + "×" + job.size + " (" + blob.size + " bytes)";
+}
+
+(async function () {
+  var failed = 0;
+  for (var i = 0; i < JOBS.length; i++) {
+    var li = line("… " + JOBS[i].out);
+    try {
+      var msg = await run(JOBS[i]);
+      li.textContent = "ok " + msg;
+      li.className = "ok";
+    } catch (e) {
+      li.textContent = "FAILED " + JOBS[i].out + ": " + e.message;
+      li.className = "bad";
+      failed++;
+    }
+  }
+  var summary = line(failed ? failed + " failed" : "all " + JOBS.length + " exported");
+  summary.className = failed ? "bad" : "ok";
+  window.__done = { failed: failed, total: JOBS.length };
+})();
+</script>
+</body>
+</html>

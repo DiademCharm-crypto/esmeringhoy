@@ -24,8 +24,18 @@
      OPTIONS *                         -> CORS preflight
      GET  /_health                     -> { ok, bucket, ... }
 
-     POST /track                       -> count a view + its watch time (player)
-     GET  /stats?days=7                -> aggregated reporting (admin panel only)
+     GET    /comments?key=<id>[&owner=<token>] -> guest comments for a title
+     POST   /comments                  -> post a comment
+     PATCH  /comments                  -> edit your own comment
+     DELETE /comments                  -> delete your own comment      PUT    /catalog                     -> save the live catalog (admin code)
+      GET    /catalog.js                 -> live catalog when one is published
+      GET    /views?key=<id>              -> live view count for a title
+      POST   /views                       -> count one play
+      GET    /votes?key=<id>&voter=<t>    -> vote totals + this browser's vote
+      POST   /votes                       -> set or clear this browser's vote
+
+      POST   /track                       -> count a view + its watch time (player)
+      GET    /stats?days=7                -> aggregated reporting (admin panel only)
 
    VARIABLES (Settings -> Variables and Secrets)
      BUCKET_NAME          required   the B2 bucket name
@@ -292,8 +302,8 @@ function corsHeaders(env, origin, extra) {
   const headers = new Headers(extra);
   if (origin && originAllowed(env, origin)) {
     headers.set("Access-Control-Allow-Origin", origin === "null" ? "*" : origin);
-    headers.set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");
-    headers.set("Access-Control-Allow-Headers", "Range, Content-Type, Authorization");
+    headers.set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Range, Content-Type, Authorization, X-Admin-Code");
     headers.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges, ETag");
     headers.set("Access-Control-Max-Age", "86400");
     headers.set("Vary", "Origin");
@@ -381,7 +391,31 @@ const SCHEMA = [
     "device TEXT, " +
     "referrer TEXT)",
   "CREATE INDEX IF NOT EXISTS play_sessions_started ON play_sessions (started_at)",
-  "CREATE INDEX IF NOT EXISTS play_sessions_key ON play_sessions (key, started_at)"
+  "CREATE INDEX IF NOT EXISTS play_sessions_key ON play_sessions (key, started_at)",
+  "CREATE TABLE IF NOT EXISTS comments (" +
+    "id TEXT PRIMARY KEY, " +
+    "key TEXT NOT NULL, " +
+    "name TEXT NOT NULL, " +
+    "body TEXT NOT NULL, " +
+    "owner TEXT NOT NULL, " +
+    "created_at INTEGER NOT NULL, " +
+    "updated_at INTEGER NOT NULL)",
+  "CREATE INDEX IF NOT EXISTS comments_key ON comments (key, created_at)",
+  "CREATE TABLE IF NOT EXISTS title_views (" +
+    "key TEXT PRIMARY KEY, " +
+    "views INTEGER NOT NULL DEFAULT 0, " +
+    "updated_at INTEGER NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS votes (" +
+    "key TEXT NOT NULL, " +
+    "voter TEXT NOT NULL, " +
+    "value INTEGER NOT NULL, " +
+    "updated_at INTEGER NOT NULL, " +
+    "PRIMARY KEY (key, voter))",
+  "CREATE INDEX IF NOT EXISTS votes_key ON votes (key)",
+  "CREATE TABLE IF NOT EXISTS catalog (" +
+    "id INTEGER PRIMARY KEY, " +
+    "body TEXT NOT NULL, " +
+    "updated_at INTEGER NOT NULL)"
 ];
 
 /* One schema round trip per isolate, not per request. */
@@ -715,6 +749,531 @@ async function statsRequest(request, env, origin, url) {
   });
 }
 
+/* ============================================================================
+   COMMENTS
+   ----------------------------------------------------------------------------
+   Guest comments, stored in D1 and shared by every visitor.
+
+     GET    /comments?key=<video id>&owner=<token>  -> { comments: [...] }
+     POST   /comments                               -> { comment: {...} }
+     PATCH  /comments                               -> { comment: {...} }
+     DELETE /comments                               -> { ok: true }
+
+   A comment belongs to the browser that posted it, not to an account: the
+   client generates a random owner token, keeps it in localStorage, and sends it
+   only when editing or deleting. The database stores an HMAC of that token, so
+   a leaked database cannot be used to take over comments, and list responses
+   never include it.
+   ========================================================================== */
+
+const COMMENT_KEY = /^[A-Za-z0-9_-]{1,80}$/;
+const COMMENT_OWNER = /^[A-Za-z0-9_-]{16,80}$/;
+const COMMENT_ID = /^[a-f0-9]{32}$/;
+const COMMENT_MAX_NAME = 32;
+const COMMENT_MAX_BODY = 1000;
+const COMMENT_LIMIT = 200;
+
+function commentName(value) {
+  const name = String(value == null ? "" : value)
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, COMMENT_MAX_NAME);
+  return name || "Anonymous" + Math.floor(10000 + Math.random() * 90000);
+}
+
+function commentBody(value) {
+  return String(value == null ? "" : value).trim().slice(0, COMMENT_MAX_BODY);
+}
+
+async function commentOwnerHash(env, token) {
+  const salt = env.MEDIA_SIGNING_KEY || "esmeringhoy-comments";
+  return (await hmacHex(salt, "comment-owner:" + token)).slice(0, 32);
+}
+
+async function readCommentBody(request) {
+  const text = await request.text().catch(() => "");
+  if (!text || text.length > 8192) return null;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function commentObject(row, ownerHash) {
+  return {
+    id: row.id,
+    name: row.name,
+    body: row.body,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    owned: Boolean(ownerHash) && sameHex(row.owner, ownerHash)
+  };
+}
+
+async function commentsRequest(request, env, origin, url) {
+  if (!callerAllowed(env, request)) {
+    return jsonResponse(env, null, {
+      error: "origin_not_allowed",
+      message: origin
+        ? "Add " + origin + " to SITE_ORIGINS."
+        : "Cross-site request with no Origin; add the calling origin to SITE_ORIGINS."
+    }, 403);
+  }
+
+  if (!env.DB) {
+    return jsonResponse(env, origin, {
+      error: "no_database",
+      message: "Comments need the D1 database bound to this Worker as DB."
+    }, 501);
+  }
+
+  await ensureSchema(env);
+
+  const token = String(url.searchParams.get("owner") || "");
+  const ownerHash = COMMENT_OWNER.test(token) ? await commentOwnerHash(env, token) : "";
+
+  if (request.method === "GET") {
+    const key = String(url.searchParams.get("key") || "");
+    if (!COMMENT_KEY.test(key)) {
+      return jsonResponse(env, origin, { error: "bad_key", message: "Pass ?key=<video id>." }, 400);
+    }
+
+    const rows = (await env.DB.prepare(
+      "SELECT id, name, body, owner, created_at, updated_at FROM comments WHERE key = ? " +
+      "ORDER BY created_at DESC LIMIT ?"
+    ).bind(key, COMMENT_LIMIT).all()).results || [];
+
+    return jsonResponse(env, origin, {
+      comments: rows.map((row) => commentObject(row, ownerHash))
+    });
+  }
+
+  const body = await readCommentBody(request);
+  if (!body) {
+    return jsonResponse(env, origin, { error: "bad_body", message: "Send a JSON body." }, 400);
+  }
+
+  if (request.method === "POST") {
+    const key = String(body.key || "");
+    const owner = String(body.owner || "");
+    if (!COMMENT_KEY.test(key)) {
+      return jsonResponse(env, origin, { error: "bad_key", message: "A valid video id is required." }, 400);
+    }
+    if (!COMMENT_OWNER.test(owner)) {
+      return jsonResponse(env, origin, { error: "bad_owner", message: "A valid owner token is required." }, 400);
+    }
+
+    const text = commentBody(body.body);
+    if (!text) {
+      return jsonResponse(env, origin, { error: "empty_body", message: "Write something first." }, 400);
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const comment = {
+      id: crypto.randomUUID().replace(/-/g, ""),
+      name: commentName(body.name),
+      body: text
+    };
+
+    await env.DB.prepare(
+      "INSERT INTO comments (id, key, name, body, owner, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).bind(comment.id, key, comment.name, comment.body, await commentOwnerHash(env, owner), now, now).run();
+
+    return jsonResponse(env, origin, {
+      comment: {
+        id: comment.id,
+        name: comment.name,
+        body: comment.body,
+        createdAt: now,
+        updatedAt: now,
+        owned: true
+      }
+    });
+  }
+
+  if (request.method === "PATCH" || request.method === "DELETE") {
+    const id = String(body.id || "");
+    const owner = String(body.owner || "");
+    if (!COMMENT_ID.test(id)) {
+      return jsonResponse(env, origin, { error: "bad_id", message: "A valid comment id is required." }, 400);
+    }
+    if (!COMMENT_OWNER.test(owner)) {
+      return jsonResponse(env, origin, { error: "bad_owner", message: "A valid owner token is required." }, 400);
+    }
+
+    const existing = await env.DB.prepare(
+      "SELECT id, name, body, owner, created_at, updated_at FROM comments WHERE id = ?"
+    ).bind(id).first();
+
+    /* Deleting something already gone is the outcome the caller wanted. */
+    if (!existing) {
+      return request.method === "DELETE"
+        ? jsonResponse(env, origin, { ok: true, id: id })
+        : jsonResponse(env, origin, { error: "not_found" }, 404);
+    }
+
+    if (!sameHex(existing.owner, await commentOwnerHash(env, owner))) {
+      return jsonResponse(env, origin, {
+        error: "not_owner",
+        message: "This comment belongs to another browser."
+      }, 403);
+    }
+
+    if (request.method === "DELETE") {
+      await env.DB.prepare("DELETE FROM comments WHERE id = ?").bind(id).run();
+      return jsonResponse(env, origin, { ok: true, id: id });
+    }
+
+    const text = commentBody(body.body);
+    if (!text) {
+      return jsonResponse(env, origin, { error: "empty_body", message: "Write something first." }, 400);
+    }
+
+    const name = commentName(body.name);
+    const now = Math.floor(Date.now() / 1000);
+    await env.DB.prepare(
+      "UPDATE comments SET name = ?, body = ?, updated_at = ? WHERE id = ?"
+    ).bind(name, text, now, id).run();
+
+    return jsonResponse(env, origin, {
+      comment: {
+        id: id,
+        name: name,
+        body: text,
+        createdAt: Number(existing.created_at),
+        updatedAt: now,
+        owned: true
+      }
+    });
+  }
+
+  return jsonResponse(env, origin, { error: "method_not_allowed" }, 405);
+}
+
+/* ============================================================================
+   CATALOG, VIEWS AND VOTES
+   ----------------------------------------------------------------------------
+   catalog.js is normally a static asset. Once an admin publishes, this Worker
+   serves that file from D1 instead, so every page picks the new catalog up on
+   its next load without a redeploy.
+
+     GET /catalog                 -> the stored catalog as JSON
+     PUT /catalog                 -> publish it (X-Admin-Code required)
+     GET /views?key=<video id>    -> live view total
+     POST /views                  -> record one view
+     GET /votes?key=<id>&voter=   -> like/dislike totals + this browser's vote
+     POST /votes                  -> set / change / clear this browser's vote
+   ========================================================================== */
+
+const VIDEO_KEY = /^[A-Za-z0-9_-]{1,80}$/;
+
+function adminCodeOk(env, request) {
+  const provided = request.headers.get("X-Admin-Code") || "";
+  const expected = env.ADMIN_CODE || "050603";
+  return sameHex(provided, expected);
+}
+
+async function readLargeBody(request, limit) {
+  const text = await request.text().catch(() => "");
+  if (!text || text.length > limit) return null;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function cleanUrl(value) {
+  const url = String(value == null ? "" : value).trim().slice(0, 2000);
+  return url || null;
+}
+
+/* Accept only the fields the site can actually render. Everything is clipped to
+   a sane length, so a bad publish cannot store a 50 MB row or a broken shape. */
+function normalizeCatalog(input) {
+  if (!input || !Array.isArray(input.videos) || input.videos.length > 500) return null;
+
+  const videos = [];
+  const seen = new Set();
+
+  for (const raw of input.videos) {
+    if (!raw || typeof raw !== "object") return null;
+    const id = String(raw.id || "").trim();
+    const title = String(raw.title || "").trim().slice(0, 200);
+    if (!VIDEO_KEY.test(id) || !title || seen.has(id)) return null;
+    seen.add(id);
+
+    const video = {
+      id: id,
+      title: title,
+      description: String(raw.description || "").trim().slice(0, 2000),
+      poster: cleanUrl(raw.poster),
+      video: cleanUrl(raw.video),
+      duration: String(raw.duration || "").slice(0, 20),
+      views: Math.max(0, Number(raw.views) || 0),
+      rating: Math.max(0, Math.min(100, Number(raw.rating) || 0)),
+      added: /^\d{4}-\d{2}-\d{2}$/.test(String(raw.added || ""))
+        ? String(raw.added)
+        : new Date().toISOString().slice(0, 10),
+      tags: (Array.isArray(raw.tags) ? raw.tags : [])
+        .map((tag) => String(tag).trim().slice(0, 40))
+        .filter(Boolean)
+        .slice(0, 20)
+    };
+
+    if (Array.isArray(raw.clips)) {
+      video.clips = raw.clips
+        .map((clip, i) => ({
+          label: String((clip && clip.label) || i + 1).slice(0, 20),
+          video: cleanUrl(clip && clip.video)
+        }))
+        .filter((clip) => Boolean(clip.video))
+        .slice(0, 200);
+    }
+
+    if (Array.isArray(raw.gallery)) {
+      video.gallery = raw.gallery
+        .map(cleanUrl)
+        .filter(Boolean)
+        .slice(0, 500);
+    }
+
+    videos.push(video);
+  }
+
+  const categories = (Array.isArray(input.categories) ? input.categories : [])
+    .map((name) => String(name).trim().slice(0, 40))
+    .filter(Boolean)
+    .slice(0, 40);
+
+  const media = {
+    b2BaseUrl: String((input.media && input.media.b2BaseUrl) || "").trim().slice(0, 500),
+    signEndpoint: String((input.media && input.media.signEndpoint) || "").trim().slice(0, 500)
+  };
+
+  return { videos: videos, categories: categories, media: media };
+}
+
+function catalogJs(catalog) {
+  return (
+    "/* ESMERINGHOY — live catalog (served from D1) */\n" +
+    "window.ESMERINGHOY_MEDIA = " + JSON.stringify(catalog.media || {}, null, 2) + ";\n\n" +
+    "window.ESMERINGHOY_CATEGORIES = " + JSON.stringify(catalog.categories || [], null, 2) + ";\n\n" +
+    "window.ESMERINGHOY_VIDEOS = " + JSON.stringify(catalog.videos || [], null, 2) + ";\n"
+  );
+}
+
+async function catalogRequest(request, env, origin, url) {
+  if (!callerAllowed(env, request)) {
+    return jsonResponse(env, null, {
+      error: "origin_not_allowed",
+      message: origin ? "Add " + origin + " to SITE_ORIGINS." : "Add the calling origin to SITE_ORIGINS."
+    }, 403);
+  }
+  if (!env.DB) {
+    return jsonResponse(env, origin, {
+      error: "no_database",
+      message: "Live publishing needs the D1 database bound as DB."
+    }, 501);
+  }
+
+  await ensureSchema(env);
+
+  if (request.method === "GET") {
+    const row = await env.DB.prepare("SELECT body, updated_at FROM catalog WHERE id = 1").first();
+    if (!row) return jsonResponse(env, origin, { catalog: null });
+    let catalog = null;
+    try { catalog = JSON.parse(row.body); } catch { catalog = null; }
+    return jsonResponse(env, origin, { catalog: catalog, updatedAt: Number(row.updated_at) || null });
+  }
+
+  if (request.method === "PUT") {
+    if (!adminCodeOk(env, request)) {
+      return jsonResponse(env, origin, {
+        error: "unauthorized",
+        message: "The admin code is missing or wrong."
+      }, 403);
+    }
+
+    const input = await readLargeBody(request, 2 * 1024 * 1024);
+    const catalog = normalizeCatalog(input);
+    if (!catalog) {
+      return jsonResponse(env, origin, {
+        error: "bad_catalog",
+        message: "The catalog payload is invalid or too large."
+      }, 400);
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const body = JSON.stringify(catalog);
+    const existing = await env.DB.prepare("SELECT id FROM catalog WHERE id = 1").first();
+
+    if (existing) {
+      await env.DB.prepare("UPDATE catalog SET body = ?, updated_at = ? WHERE id = 1")
+        .bind(body, now).run();
+    } else {
+      await env.DB.prepare("INSERT INTO catalog (id, body, updated_at) VALUES (1, ?, ?)")
+        .bind(body, now).run();
+    }
+
+    return jsonResponse(env, origin, {
+      ok: true,
+      updatedAt: now,
+      clips: catalog.videos.length
+    });
+  }
+
+  return jsonResponse(env, origin, { error: "method_not_allowed" }, 405);
+}
+
+async function liveCatalogResponse(request, env) {
+  if (!env.DB) return null;
+
+  await ensureSchema(env);
+  const row = await env.DB.prepare("SELECT body FROM catalog WHERE id = 1").first();
+  if (!row || !row.body) return null;
+
+  let catalog = null;
+  try { catalog = JSON.parse(row.body); } catch { return null; }
+
+  return new Response(request.method === "HEAD" ? null : catalogJs(catalog), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex"
+    }
+  });
+}
+
+async function viewsRequest(request, env, origin, url) {
+  if (!callerAllowed(env, request)) {
+    return jsonResponse(env, null, { error: "origin_not_allowed" }, 403);
+  }
+  if (!env.DB) {
+    return jsonResponse(env, origin, { error: "no_database", message: "Views need the D1 database." }, 501);
+  }
+
+  await ensureSchema(env);
+
+  let key = String(url.searchParams.get("key") || "");
+  let increment = false;
+
+  if (request.method === "POST") {
+    const body = await readCommentBody(request);
+    if (!body) return jsonResponse(env, origin, { error: "bad_body" }, 400);
+    key = String(body.key || "");
+    increment = true;
+  } else if (request.method !== "GET") {
+    return jsonResponse(env, origin, { error: "method_not_allowed" }, 405);
+  }
+
+  if (!VIDEO_KEY.test(key)) {
+    return jsonResponse(env, origin, { error: "bad_key", message: "Pass a video id." }, 400);
+  }
+
+  if (increment) {
+    const now = Math.floor(Date.now() / 1000);
+    const existing = await env.DB.prepare("SELECT key FROM title_views WHERE key = ?").bind(key).first();
+    if (existing) {
+      await env.DB.prepare("UPDATE title_views SET views = views + 1, updated_at = ? WHERE key = ?")
+        .bind(now, key).run();
+    } else {
+      await env.DB.prepare("INSERT INTO title_views (key, views, updated_at) VALUES (?, 1, ?)")
+        .bind(key, now).run();
+    }
+  }
+
+  const row = await env.DB.prepare("SELECT views FROM title_views WHERE key = ?").bind(key).first();
+  return jsonResponse(env, origin, { key: key, views: Number(row && row.views) || 0 });
+}
+
+async function voterHash(env, token) {
+  const salt = env.MEDIA_SIGNING_KEY || "esmeringhoy-votes";
+  return (await hmacHex(salt, "vote:" + token)).slice(0, 32);
+}
+
+async function voteSummary(env, key, hash) {
+  const counts = await env.DB.prepare(
+    "SELECT SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END) AS likes, " +
+    "SUM(CASE WHEN value = -1 THEN 1 ELSE 0 END) AS dislikes FROM votes WHERE key = ?"
+  ).bind(key).first();
+
+  const mine = hash
+    ? await env.DB.prepare("SELECT value FROM votes WHERE key = ? AND voter = ?").bind(key, hash).first()
+    : null;
+
+  return {
+    likes: Number(counts && counts.likes) || 0,
+    dislikes: Number(counts && counts.dislikes) || 0,
+    mine: Number(mine && mine.value) || 0
+  };
+}
+
+async function votesRequest(request, env, origin, url) {
+  if (!callerAllowed(env, request)) {
+    return jsonResponse(env, null, { error: "origin_not_allowed" }, 403);
+  }
+  if (!env.DB) {
+    return jsonResponse(env, origin, { error: "no_database", message: "Votes need the D1 database." }, 501);
+  }
+
+  await ensureSchema(env);
+
+  let key = String(url.searchParams.get("key") || "");
+  let voter = String(url.searchParams.get("voter") || "");
+  let value = null;
+
+  if (request.method === "POST") {
+    const body = await readCommentBody(request);
+    if (!body) return jsonResponse(env, origin, { error: "bad_body" }, 400);
+    key = String(body.key || "");
+    voter = String(body.voter || "");
+    value = Number(body.value);
+    if (![1, -1, 0].includes(value)) {
+      return jsonResponse(env, origin, { error: "bad_value", message: "value must be 1, -1 or 0." }, 400);
+    }
+  } else if (request.method !== "GET") {
+    return jsonResponse(env, origin, { error: "method_not_allowed" }, 405);
+  }
+
+  if (!VIDEO_KEY.test(key)) {
+    return jsonResponse(env, origin, { error: "bad_key", message: "Pass a video id." }, 400);
+  }
+  if (voter && !COMMENT_OWNER.test(voter)) {
+    return jsonResponse(env, origin, { error: "bad_voter" }, 400);
+  }
+
+  const hash = voter ? await voterHash(env, voter) : "";
+
+  if (request.method === "POST") {
+    const now = Math.floor(Date.now() / 1000);
+    if (value === 0) {
+      await env.DB.prepare("DELETE FROM votes WHERE key = ? AND voter = ?").bind(key, hash).run();
+    } else {
+      const existing = await env.DB.prepare(
+        "SELECT value FROM votes WHERE key = ? AND voter = ?"
+      ).bind(key, hash).first();
+
+      if (existing) {
+        await env.DB.prepare(
+          "UPDATE votes SET value = ?, updated_at = ? WHERE key = ? AND voter = ?"
+        ).bind(value, now, key, hash).run();
+      } else {
+        await env.DB.prepare(
+          "INSERT INTO votes (key, voter, value, updated_at) VALUES (?, ?, ?, ?)"
+        ).bind(key, hash, value, now).run();
+      }
+    }
+  }
+
+  return jsonResponse(env, origin, await voteSummary(env, key, hash));
+}
+
 /* ------------------------------------------------------------------ handler -- */
 
 /* Who is asking: the Origin header when the browser sends one, otherwise the
@@ -750,6 +1309,29 @@ async function handleRequest(request, env, ctx) {
   if (url.pathname === "/stats" || url.pathname === "/stats/") {
     /* Never let a shared cache hold one viewer's reporting. */
     const response = await statsRequest(request, env, requestOrigin, url);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+
+  /* -------------------------------------------------------------- comments -- */
+
+  if (url.pathname === "/comments" || url.pathname === "/comments/") {
+    const response = await commentsRequest(request, env, requestOrigin, url);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+  if (url.pathname === "/views" || url.pathname === "/views/") {
+    const response = await viewsRequest(request, env, requestOrigin, url);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+  if (url.pathname === "/votes" || url.pathname === "/votes/") {
+    const response = await votesRequest(request, env, requestOrigin, url);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+  if (url.pathname === "/catalog" || url.pathname === "/catalog/") {
+    const response = await catalogRequest(request, env, requestOrigin, url);
     response.headers.set("Cache-Control", "no-store");
     return response;
   }
@@ -808,6 +1390,13 @@ async function handleRequest(request, env, ctx) {
         statsEndpoint: env.STATS_TOKEN ? "locked" : "unconfigured"
       }
     });
+  }
+
+  /* The live catalog, when one has been published. Without it the static
+     catalog.js asset below is served, so a fresh install still works. */
+  if (url.pathname === "/catalog.js") {
+    const live = await liveCatalogResponse(request, env);
+    if (live) return live;
   }
 
   /* --------------------------------------------------------------- assets -- */
